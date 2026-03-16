@@ -1,17 +1,13 @@
 import streamlit as st
 
 st.set_page_config(initial_sidebar_state="collapsed")
-st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
+st.title("🏥 Step 1: Medical Context")
 
-st.title("🏥 Step 2: Medical Context")
 st.multiselect("Select any active conditions:", 
-               ["None", "Diabetes", "BP", "Thyroid", "PCOD"], 
+               ["None", "Diabetes", "BP Control", "Thyroid", "PCOD/PCOS"], 
                key="meds")
 
-st.progress(40)
+st.progress(25)
 
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("⬅️ Back"): st.switch_page("cura.py")
-with col2:
-    if st.button("Next: Diet Preference ➡️"): st.switch_page("pages/2_Diet.py")
+if st.button("Next: Set Your Goal 🎯"):
+    st.switch_page("pages/2_Goal.py") # Ensure filename matches exactly
