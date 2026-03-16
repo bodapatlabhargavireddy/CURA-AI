@@ -1,17 +1,15 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Page Configuration
-st.set_page_config(page_title="Cura AI Dashboard", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
 
-# 1. API Setup
+# API Setup
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.error("⚠️ API Key not found! Add it to Streamlit Secrets.")
-    st.stop()
+    st.error("API Key Missing!")
 
-st.title("🛡️ Your Cura Health Analysis")
+st.title("🛡️ Cura Health Hub & Live Monitor")
 
 # --- DATA RETRIEVAL ---
 w = st.session_state.get("weight", 70.0)
@@ -22,97 +20,59 @@ cuisine = st.session_state.get("cuisine", "Indian")
 meds = st.session_state.get("meds", ["None"])
 goal = st.session_state.get("goal", "Maintenance")
 
-# --- SMART LOGIC ENGINE ---
-# Basic Calorie Calculation (Mifflin-St Jeor)
+# --- CALCULATION LOGIC ---
 s = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s
 tdee = int(bmr * 1.3)
+if "Weight Loss" in goal: tdee -= 500
+elif "Weight Gain" in goal: tdee += 400
 
-# Goal-Specific Adjustments
-step_goal = 8000
-advice_note = "Standard balanced nutrition."
-
-if goal == "Weight Loss":
-    tdee -= 500
-    step_goal = 10000
-elif goal == "Weight Gain":
-    tdee += 400
-    step_goal = 6000
-elif "PCOD" in goal or "Diabetes" in goal:
-    tdee -= 200 
-    step_goal = 11000
-    advice_note = "Focus on Low Glycemic Index (GI) foods."
-elif "Thyroid" in goal:
-    step_goal = 9000
-    advice_note = "Focus on Iodine/Selenium rich foods, avoid raw cruciferous veggies."
-elif "BP Control" in goal:
-    step_goal = 10000
-    advice_note = "DASH Diet: Low Sodium (Salt) and high Potassium."
-
-# Water and Protein
-water_target = round(w * 0.035, 1)
-protein_target = int(w * 1.4) # Standard 1.4g/kg
-
-# --- DISPLAY OUTPUT: THE 4 KEY METRICS ---
-st.subheader(f"🚀 Daily Targets for {goal}")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("🔥 Calories", f"{tdee} kcal")
-with col2:
-    st.metric("💧 Water", f"{water_target} L")
-with col3:
-    st.metric("🍗 Protein", f"{protein_target} g")
-with col4:
-    st.metric("👟 Step Goal", f"{step_goal}")
-
-st.info(f"💡 **Expert Tip:** {advice_note}")
+# --- FEATURE 1: 4 KEY METRICS ---
+st.subheader("🚀 Your Daily Health Targets")
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("🔥 Calories", f"{tdee} kcal")
+c2.metric("💧 Water Goal", f"{round(w * 0.035, 1)} L")
+c3.metric("🍗 Protein", f"{int(w * 1.4)} g")
+c4.metric("👟 Step Goal", "10,000" if "BP" in goal or "PCOD" in goal else "8,000")
 
 st.divider()
 
-# --- AI GENERATOR: THE FOOD MENU ---
-st.subheader(f"🍱 AI Generated {cuisine} Menu")
-st.write(f"Tailored for: **{goal}**")
+# --- FEATURE 2: LIVE MONITORING (VITALS) ---
+st.subheader("💓 Real-Time Vitals Tracking")
+m_col1, m_col2, m_col3 = st.columns(3)
 
+with m_col1:
+    hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
+    if hr > 100: st.error("🚩 High Heart Rate Alert")
+with m_col2:
+    bp = st.number_input("Systolic BP (Upper)", 80, 200, 120)
+    if bp > 140: st.error("🚩 Hypertension Warning")
+with m_col3:
+    water_drunk = st.slider("Water Consumed (Liters)", 0.0, 5.0, 1.5, 0.25)
+
+st.divider()
+
+# --- FEATURE 3: AI FOOD MENU ---
+st.subheader(f"🍱 AI Generated {cuisine} Food Menu")
 if st.button("Generate Medical-Grade Meal Plan"):
-    with st.spinner("Cura AI is calculating your macro-nutrients..."):
+    with st.spinner("AI is analyzing your vitals and health goal..."):
         try:
             model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            # Detailed Prompt for the Menu
             prompt = f"""
-            Act as a Senior Clinical Dietitian. Create a 1-day {cuisine} food menu.
-            User Profile: {g}, {a} years old, {w}kg.
-            Primary Goal: {goal}.
-            Required Calories: {tdee} kcal.
-            
-            Format the output as follows:
-            1. Breakfast (with calorie count)
-            2. Mid-morning Snack
-            3. Lunch (with calorie count)
-            4. Evening Snack
-            5. Dinner (with calorie count)
-            
-            Ensure the food items are strictly helpful for {goal}.
+            Act as a Clinical Dietician. Create a 1-day {cuisine} meal plan. 
+            User Goal: {goal}. Medical History: {meds}. 
+            Calories: {tdee}. Vitals: HR {hr}, BP {bp}.
+            Provide Breakfast, Lunch, and Dinner with exact food items and health tips.
             """
-            
             response = model.generate_content(prompt)
+            st.markdown(response.text)
             
-            if response.text:
-                st.markdown(response.text)
-                
-                # Zomato Integration
-                st.divider()
-                st.success("✅ Menu Prepared! You can find these healthy ingredients/meals below:")
-                st.link_button(f"Search {goal} Friendly Food on Zomato", 
-                               f"https://www.zomato.com/search?q=healthy+{cuisine}+food")
-            
-        except Exception as e:
-            st.error("AI is currently overloaded. Please try again in 10 seconds.")
-            st.info(f"Technical Log: {e}")
+            # Zomato link
+            st.link_button(f"Order {goal} Friendly Food", f"https://www.zomato.com/search?q=healthy+{cuisine}")
+        except Exception:
+            st.error("AI Node Busy. Please try again.")
 
-# --- SIDEBAR RESTART ---
-st.sidebar.markdown("---")
-if st.sidebar.button("🔄 Reset & New Entry"):
+# Sidebar Navigation
+if st.sidebar.button("🔄 Restart Assessment"):
     st.session_state.clear()
     st.switch_page("cura.py")
