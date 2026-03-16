@@ -12,28 +12,48 @@ else:
 st.title("🛡️ Cura AI Health Hub")
 
 # --- DATA RETRIEVAL (Same as before) ---
+import streamlit as st
+
+# --- DYNAMIC DATA RETRIEVAL ---
+# We check if the user entered data; otherwise, we use a fallback
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
 g = st.session_state.get("gender", "Male")
-cuisine = st.session_state.get("cuisine", "Indian")
-meds = st.session_state.get("meds", ["None"])
 goal = st.session_state.get("goal", "Maintenance")
 
-# --- CALCULATIONS ---
+# --- CUSTOM CALCULATION LOGIC ---
+# This makes the numbers change for EVERY person
 s = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s
-tdee = int(bmr * 1.3)
-if "Weight Loss" in goal: tdee -= 500
-elif "Weight Gain" in goal: tdee += 400
 
-# --- DISPLAY METRICS ---
+# Physical Activity Multiplier (1.3 for sedentary, 1.5 for active)
+tdee = int(bmr * 1.3)
+
+# Goal Adjustments (The key to making it different!)
+if goal == "Weight Loss":
+    tdee -= 500
+    steps = 10000
+elif goal == "Weight Gain":
+    tdee += 400
+    steps = 6000
+else:
+    steps = 8000
+
+# Water Calculation based on Weight
+water = round(w * 0.035, 1)
+
+# Protein Calculation based on Weight
+protein = int(w * 1.5)
+
+# --- DISPLAY (Matching your screenshot) ---
+st.title("🛡️ Cura AI Health Hub")
 st.subheader("🚀 Your Daily Health Targets")
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("🔥 Calories", f"{tdee} kcal")
-c2.metric("💧 Water", f"{round(w * 0.035, 1)} L")
-c3.metric("🍗 Protein", f"{int(w * 1.5)} g")
-c4.metric("👟 Steps", "10,000" if "BP" in goal or "PCOD" in goal else "8,000")
+
+st.metric("🔥 Calories", f"{tdee} kcal")
+st.metric("💧 Water", f"{water} L")
+st.metric("🍗 Protein", f"{protein} g")
+st.metric("👟 Steps", f"{steps:,}")
 
 st.divider()
 
