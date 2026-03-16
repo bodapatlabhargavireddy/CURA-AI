@@ -1,0 +1,10 @@
+your_project/
+├── main.py              # This becomes your "Router" (the entry point)
+├── .streamlit/
+│   └── secrets.toml     # Your GEMINI_API_KEY stays here
+├── app_pages/
+│   ├── dashboard.py     # Profile & Metrics
+│   ├── meal_planner.py  # AI Meal Planner
+│   ├── scanner.py       # Vision Scanner
+│   └── tracker.py       # Journey Tracker
+└── requirements.txt
