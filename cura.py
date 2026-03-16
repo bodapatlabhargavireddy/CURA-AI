@@ -15,7 +15,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # API Configuration
-GOOGLE_API_KEY = "st.secrets["GEMINI_API_KEY"]" 
+GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
 def get_gemini_response(prompt, image=None):
