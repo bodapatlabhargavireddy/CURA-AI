@@ -1,116 +1,115 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. CLEAN API SETUP ---
+# 1. Page Configuration
+st.set_page_config(page_title="Cura AI Dashboard", layout="wide", initial_sidebar_state="collapsed")
+
+# 2. API Configuration (Using standard stable setup)
 if "GEMINI_API_KEY" in st.secrets:
-    # We use the default configuration to avoid the v1beta URL error
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.error("❌ API Key Missing!")
+    st.error("❌ API Key Missing in Streamlit Secrets!")
     st.stop()
 
 st.title("🛡️ Cura AI Health Hub")
 
-# --- DATA RETRIEVAL (Same as before) ---
-import streamlit as st
-
-# --- DYNAMIC DATA RETRIEVAL ---
-# We check if the user entered data; otherwise, we use a fallback
+# --- 3. DYNAMIC DATA RETRIEVAL ---
+# These pull from your previous pages. If no data is found, it uses defaults.
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
 g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Maintenance")
+cuisine = st.session_state.get("cuisine", "Indian")
+meds = st.session_state.get("meds", ["None"])
 
-# --- CUSTOM CALCULATION LOGIC ---
-# This makes the numbers change for EVERY person
+# --- 4. THE CALCULATION ENGINE (The "Personalizer") ---
+# Mifflin-St Jeor Equation
 s = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s
+tdee = int(bmr * 1.3) # Base calories for sedentary activity
 
-# Physical Activity Multiplier (1.3 for sedentary, 1.5 for active)
-tdee = int(bmr * 1.3)
-
-# Goal Adjustments (The key to making it different!)
-if goal == "Weight Loss":
+# Adjust Calories and Steps based on User Goal
+if "Weight Loss" in goal:
     tdee -= 500
-    steps = 10000
-elif goal == "Weight Gain":
+    step_goal = 10000
+elif "Weight Gain" in goal:
     tdee += 400
-    steps = 6000
+    step_goal = 6000
 else:
-    steps = 8000
+    step_goal = 8000
 
-# Water Calculation based on Weight
-water = round(w * 0.035, 1)
+# Water: 35ml per kg of body weight
+water_goal = round(w * 0.035, 1)
 
-# Protein Calculation based on Weight
-protein = int(w * 1.5)
+# Protein: 1.5g per kg of body weight
+protein_goal = int(w * 1.5)
 
-# --- DISPLAY (Matching your screenshot) ---
-st.title("🛡️ Cura AI Health Hub")
-st.subheader("🚀 Your Daily Health Targets")
+# --- 5. DISPLAY: DYNAMIC METRICS ---
+st.subheader("🚀 Your Personalized Daily Targets")
+col1, col2, col3, col4 = st.columns(4)
 
-st.metric("🔥 Calories", f"{tdee} kcal")
-st.metric("💧 Water", f"{water} L")
-st.metric("🍗 Protein", f"{protein} g")
-st.metric("👟 Steps", f"{steps:,}")
+with col1:
+    st.metric("🔥 Calories", f"{tdee} kcal")
+with col2:
+    st.metric("💧 Water", f"{water_goal} L")
+with col3:
+    st.metric("🍗 Protein", f"{protein_goal} g")
+with col4:
+    st.metric("👟 Steps", f"{step_goal:,}")
 
 st.divider()
 
-# --- MONITORING INPUTS ---
-st.subheader("💓 Live Vitals")
+# --- 6. LIVE MONITORING (VITALS) ---
+st.subheader("💓 Live Vitals & Progress")
 m1, m2, m3 = st.columns(3)
-with m1: hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
-with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
-with m3: water_drunk = st.slider("Water Consumed (L)", 0.0, 5.0, 1.5)
+
+with m1:
+    hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
+    if hr > 100: st.error("🚩 High Heart Rate Alert")
+with m2:
+    bp = st.number_input("Systolic BP (Upper)", 80, 200, 120)
+    if bp > 140: st.error("🚩 Hypertension Warning")
+with m3:
+    # Tracking current weight vs starting weight
+    cur_w = st.number_input("Current Weight (kg)", 30.0, 200.0, float(w))
+    diff = round(cur_w - w, 2)
+    if diff != 0:
+        st.info(f"Change: {diff} kg")
+
 st.divider()
-# --- THE AI FOOD MENU (FIXED & RENAMED) ---
-st.subheader(f"🍱 AI {cuisine} Food Menu for {goal}")
+
+# --- 7. AI FOOD MENU GENERATOR ---
+st.subheader(f"🍱 Personalized {cuisine} Food Menu")
 
 if st.button("✨ Generate AI Food Menu"):
-    with st.spinner("Cura AI is preparing your personalized food menu..."):
-        # The prompt remains professional but the UI labels are now "Food Menu"
+    with st.spinner("AI is analyzing your vitals and progress..."):
+        # Structured prompt to ensure the AI uses the dynamic data
         prompt = f"""
-        Act as a Nutritionist. Create a 1-day {cuisine} food menu for a {g}, {a}yrs, {w}kg. 
-        Goal: {goal}. Medical Context: {meds}. Vitals: BP {bp}, HR {hr}.
-        Target: {tdee} calories. 
-        Provide: Breakfast, Lunch, Dinner, and a Snack. 
-        Briefly explain why this menu fits the goal: {goal}.
+        Act as a Clinical Dietician. 
+        User: {g}, {a}yrs, {w}kg (Current: {cur_w}kg). 
+        Goal: {goal}. Medical: {meds}.
+        Vitals: BP {bp}, HR {hr}. Target: {tdee} kcal.
+        
+        Task: Create a 1-day {cuisine} Food Menu.
+        Include Breakfast, Lunch, Dinner, and 1 Snack with calorie counts.
+        Adjust the menu if current weight {cur_w} differs from starting weight {w}.
         """
 
         try:
-            # Attempt 1: Standard Stable Model
+            # Auto-recovery logic for the 404/Node Busy error
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt)
             
             if response.text:
                 st.markdown(response.text)
                 st.success("✅ Food Menu Generated!")
-                st.link_button("Order Ingredients on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
+                st.link_button("Order Healthier on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
+            else:
+                st.error("AI node returned empty results. Try again.")
 
         except Exception as e:
-            error_str = str(e)
-            # This is the Auto-Recovery if the 404 error happens again
-            if "404" in error_str:
-                try:
-                    # Scan for any model your API key currently supports
-                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    # Pick the first 'flash' or 'pro' model found
-                    fallback_name = models[0] 
-                    
-                    model_alt = genai.GenerativeModel(fallback_name)
-                    response_alt = model_alt.generate_content(prompt)
-                    
-                    st.markdown(response_alt.text)
-                    st.success(f"✅ Food Menu Generated (via {fallback_name})")
-                except Exception as final_err:
-                    st.error("🚨 Connection Error. Please verify your API Key in Streamlit Secrets.")
-            else:
-                st.error(f"Technical Issue: {error_str}")
-
-# --- SIDEBAR RESTART ---
-if st.sidebar.button("🔄 Restart Profile"):
-    st.session_state.clear()
-    st.switch_page("cura.py")
-
-st.divider()
+            # Fallback for API Model Version errors
+            try:
+                model_alt = genai.GenerativeModel('gemini-pro')
+                response_alt = model_alt.generate_
