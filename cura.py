@@ -1,16 +1,19 @@
 import streamlit as st
 
-st.set_page_config(page_title="Cura AI - Setup", layout="centered")
+st.set_page_config(page_title="Cura AI", initial_sidebar_state="collapsed")
+st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
 
-st.title("🛡️ Setup Your Health Profile")
+st.title("🛡️ Cura AI: Step 1")
+st.subheader("Physical Profile")
 
-# Using 'key' is mandatory so the Dashboard can see these values
-st.number_input("Weight (kg)", min_value=30.0, max_value=200.0, value=70.0, key="weight")
-st.number_input("Height (cm)", min_value=100.0, max_value=250.0, value=170.0, key="height")
-st.number_input("Age", min_value=10, max_value=100, value=25, key="age")
+# These 'keys' are the most important part for updating the user input
+st.number_input("Age", 15, 95, 25, key="age")
 st.selectbox("Gender", ["Male", "Female"], key="gender")
-st.selectbox("Goal", ["Maintenance", "Weight Loss", "Weight Gain"], key="goal")
-st.selectbox("Cuisine Preference", ["Indian", "Continental", "Mediterranean"], key="cuisine")
+st.number_input("Weight (kg)", 35.0, 180.0, 70.0, key="weight")
+st.number_input("Height (cm)", 100.0, 250.0, 170.0, key="height")
 
-if st.button("Go to Dashboard 🚀"):
-    st.switch_page("pages/4_Dashboard.py")
+st.progress(20) 
+
+if st.button("Next: Health Profile ➡️"):
+    # This moves to the next page while keeping the data in memory
+    st.switch_page("pages/1_Health.py")
