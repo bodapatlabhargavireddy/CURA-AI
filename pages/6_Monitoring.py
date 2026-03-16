@@ -67,35 +67,54 @@ with c_med2:
     st.checkbox("Evening 15-min Walk")
 
 st.divider()
-
-# --- THE AI FOOD MENU GENERATOR ---
+# --- THE AI FOOD MENU GENERATOR (FIXED VERSION) ---
 st.subheader("🍱 Personalized Food Menu")
 
 if st.button("🍴 Generate Food Menu Based on Progress"):
-    with st.spinner("Analyzing weight trends and vitals..."):
+    with st.spinner("Cura AI is scanning for an available medical node..."):
+        # 1. THE PROMPT
+        prompt = f"""
+        Act as a Clinical Dietician. 
+        User Goal: {goal}. 
+        Starting Weight: {starting_weight}kg, Current Weight: {current_weight}kg.
+        Vitals: HR {hr}, Sleep {sleep}hrs, BP {bp_sys}.
+        
+        Task: 
+        1. Analyze if the user is on track for their goal ({goal}).
+        2. Give a 1-day Food Menu (Breakfast, Lunch, Dinner).
+        3. If weight changed from {starting_weight} to {current_weight}, adjust the plan.
+        """
+
+        success = False
+        
+        # 2. THE RECOVERY LOOP (Finds any working model)
         try:
+            # We try the fastest model first
             model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            # The prompt now checks if the weight changed and asks for a plan adjustment
-            prompt = f"""
-            Act as a Clinical Dietician. 
-            User Goal: {goal}. 
-            Starting Weight: {starting_weight}kg, Current Weight: {current_weight}kg.
-            Vitals: HR {hr}, Sleep {sleep}hrs, BP {bp_sys}.
-            
-            Task: 
-            1. Analyze if the user is on track for their goal ({goal}).
-            2. If weight has changed unexpectedly, suggest a 'Plan Adjustment'.
-            3. Provide a 1-day Food Menu (Breakfast, Lunch, Dinner) optimized for their current vitals.
-            """
-            
             response = model.generate_content(prompt)
             st.markdown(response.text)
-            
+            success = True
         except Exception:
-            # Simple error message to keep it clean for the expo
-            st.error("AI Node Busy. Please try again in a few seconds.")
+            try:
+                # If Flash is busy, we automatically try Pro
+                model = genai.GenerativeModel('gemini-pro')
+                response = model.generate_content(prompt)
+                st.markdown(response.text)
+                success = True
+            except Exception as e:
+                # 3. THE "DEEP SCAN" (Finds hidden available models)
+                try:
+                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    # Pick the first one that exists for your key
+                    model = genai.GenerativeModel(available_models[0])
+                    response = model.generate_content(prompt)
+                    st.markdown(response.text)
+                    success = True
+                except:
+                    st.error("🚨 All AI Nodes are currently restricted. Please check your API Key in Google AI Studio.")
 
+        if success:
+            st.success("✅ Plan adjusted based on your weight change!")
 # Sidebar Navigation
 if st.sidebar.button("🔄 Back to Dashboard"):
     st.switch_page("pages/4_Dashboard.py")
