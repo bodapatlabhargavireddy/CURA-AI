@@ -49,32 +49,30 @@ with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
 with m3: water_drunk = st.slider("Water Consumed (L)", 0.0, 5.0, 1.5)
 
 st.divider()
-
-# --- THE AI FOOD MENU ---
+# --- THE AI FOOD MENU (FIXED 404 ERROR) ---
 st.subheader(f"🍱 AI {cuisine} Menu for {goal}")
 
 if st.button("✨ Generate AI Medical Menu"):
-    # We use gemini-1.5-flash because it is the FASTEST model Google has.
-    # It responds in 2-3 seconds, preventing timeouts.
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    # We make the prompt structured so the AI processes it faster
-    prompt = f"""
-    CONTEXT: Clinical Nutritionist Assistant
-    USER: {g}, {a}yrs, {w}kg. 
-    GOAL: {goal}. 
-    MEDICAL: {meds}. 
-    VITALS: BP {bp}, HR {hr}.
-    CUISINE: {cuisine}.
-    CALORIE TARGET: {tdee} kcal.
-    
-    TASK: Provide a 1-day meal menu (Breakfast, Lunch, Dinner, Snack).
-    Include calorie counts and WHY these foods help with {goal}.
-    """
+    try:
+        # 1. Use the absolute model path to avoid 404
+        # 'models/gemini-1.5-flash' is the most compatible name for v1beta
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
+        
+        prompt = f"""
+        CONTEXT: Clinical Nutritionist Assistant
+        USER: {g}, {a}yrs, {w}kg. 
+        GOAL: {goal}. 
+        MEDICAL: {meds}. 
+        VITALS: BP {bp}, HR {hr}.
+        CUISINE: {cuisine}.
+        CALORIE TARGET: {tdee} kcal.
+        
+        TASK: Provide a 1-day meal menu (Breakfast, Lunch, Dinner, Snack).
+        Include calorie counts and WHY these foods help with {goal}.
+        """
 
-    with st.spinner("Cura AI is calculating..."):
-        try:
-            # request_options adds a 60-second "wait" timer so it doesn't time out
+        with st.spinner("Cura AI is calculating..."):
+            # 2. Call the model with a clear request option
             response = model.generate_content(
                 prompt,
                 request_options={"timeout": 60}
@@ -83,12 +81,11 @@ if st.button("✨ Generate AI Medical Menu"):
             if response.text:
                 st.markdown(response.text)
                 st.success("✅ Personalized Menu Generated Successfully")
-                
-                # Zomato link
                 st.link_button(f"Order {cuisine} on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
             else:
-                st.error("The AI reached a safety block. Please re-generate.")
-                
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
-            st.info("Check if your API Key is active in Google AI Studio.")
+                st.error("The AI returned an empty response. Please try again.")
+
+    except Exception as e:
+        # This will catch if the model name is still an issue
+        st.error(f"Model Error: {str(e)}")
+        st.info("Try changing 'models/gemini-1.5-flash' to 'models/gemini-pro' in the code if this persists.")
