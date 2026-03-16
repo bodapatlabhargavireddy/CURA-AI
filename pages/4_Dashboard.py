@@ -49,13 +49,13 @@ with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
 with m3: water_drunk = st.slider("Water Consumed (L)", 0.0, 5.0, 1.5)
 
 st.divider()
-# --- THE AI FOOD MENU (FIXED 404 ERROR) ---
+# --- THE AI FOOD MENU (FIXED 404 & VERSION ERROR) ---
 st.subheader(f"🍱 AI {cuisine} Menu for {goal}")
 
 if st.button("✨ Generate AI Medical Menu"):
     try:
-        # 1. Use the absolute model path to avoid 404
-        # 'models/gemini-1.5-flash' is the most compatible name for v1beta
+        # Using 'models/' prefix is MANDATORY for some API versions to avoid 404
+        # 'gemini-1.5-flash' is the correct string for the latest library
         model = genai.GenerativeModel('models/gemini-1.5-flash')
         
         prompt = f"""
@@ -72,7 +72,7 @@ if st.button("✨ Generate AI Medical Menu"):
         """
 
         with st.spinner("Cura AI is calculating..."):
-            # 2. Call the model with a clear request option
+            # Using generate_content with a direct call
             response = model.generate_content(
                 prompt,
                 request_options={"timeout": 60}
@@ -83,9 +83,19 @@ if st.button("✨ Generate AI Medical Menu"):
                 st.success("✅ Personalized Menu Generated Successfully")
                 st.link_button(f"Order {cuisine} on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
             else:
-                st.error("The AI returned an empty response. Please try again.")
+                st.error("The AI responded but the content was empty. Try again.")
 
     except Exception as e:
-        # This will catch if the model name is still an issue
-        st.error(f"Model Error: {str(e)}")
-        st.info("Try changing 'models/gemini-1.5-flash' to 'models/gemini-pro' in the code if this persists.")
+        error_msg = str(e)
+        if "404" in error_msg:
+            st.error("🚨 API Path Error (404).")
+            st.info("Trying backup model: gemini-pro...")
+            # Fallback to the older stable model name if Flash is not recognized
+            try:
+                model_alt = genai.GenerativeModel('models/gemini-pro')
+                response_alt = model_alt.generate_content(prompt)
+                st.markdown(response_alt.text)
+            except Exception as e2:
+                st.error(f"Critical API Error: {e2}")
+        else:
+            st.error(f"Error: {error_msg}")
