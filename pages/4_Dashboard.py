@@ -1,21 +1,19 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 
-# 1. Page Config
 st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
 
-# 2. Stronger API Configuration
-# Using 'rest' transport is the secret to stopping timeouts on public/expo WiFi
+# --- 1. CLEAN API SETUP ---
 if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
+    # REMOVED transport='rest' to fix the 404 URL error
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.error("❌ API Key Missing in Secrets!")
+    st.error("❌ API Key Missing!")
     st.stop()
 
 st.title("🛡️ Cura AI Health Hub")
 
-# --- DATA RETRIEVAL ---
+# --- DATA RETRIEVAL (Same as before) ---
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
@@ -31,7 +29,7 @@ tdee = int(bmr * 1.3)
 if "Weight Loss" in goal: tdee -= 500
 elif "Weight Gain" in goal: tdee += 400
 
-# --- DISPLAY TOP METRICS ---
+# --- DISPLAY METRICS ---
 st.subheader("🚀 Your Daily Health Targets")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("🔥 Calories", f"{tdee} kcal")
@@ -49,53 +47,33 @@ with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
 with m3: water_drunk = st.slider("Water Consumed (L)", 0.0, 5.0, 1.5)
 
 st.divider()
-# --- THE AI FOOD MENU (FIXED 404 & VERSION ERROR) ---
+
+# --- THE AI FOOD MENU (FIXED 404) ---
 st.subheader(f"🍱 AI {cuisine} Menu for {goal}")
 
 if st.button("✨ Generate AI Medical Menu"):
-    try:
-        # Using 'models/' prefix is MANDATORY for some API versions to avoid 404
-        # 'gemini-1.5-flash' is the correct string for the latest library
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
-        
-        prompt = f"""
-        CONTEXT: Clinical Nutritionist Assistant
-        USER: {g}, {a}yrs, {w}kg. 
-        GOAL: {goal}. 
-        MEDICAL: {meds}. 
-        VITALS: BP {bp}, HR {hr}.
-        CUISINE: {cuisine}.
-        CALORIE TARGET: {tdee} kcal.
-        
-        TASK: Provide a 1-day meal menu (Breakfast, Lunch, Dinner, Snack).
-        Include calorie counts and WHY these foods help with {goal}.
-        """
+    with st.spinner("Cura AI is connecting..."):
+        try:
+            # Use the simplest model name possible
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            prompt = f"""
+            Create a 1-day {cuisine} meal plan for a {g}, {a}yrs, {w}kg. 
+            Goal: {goal}. Medical: {meds}. Vitals: BP {bp}, HR {hr}.
+            Target: {tdee} calories. 
+            Include Breakfast, Lunch, Dinner, and why this helps {goal}.
+            """
 
-        with st.spinner("Cura AI is calculating..."):
-            # Using generate_content with a direct call
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": 60}
-            )
+            response = model.generate_content(prompt)
             
             if response.text:
                 st.markdown(response.text)
-                st.success("✅ Personalized Menu Generated Successfully")
-                st.link_button(f"Order {cuisine} on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
+                st.success("✅ Menu Generated!")
+                st.link_button(f"Order on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
             else:
-                st.error("The AI responded but the content was empty. Try again.")
+                st.error("Empty response. Please try again.")
 
-    except Exception as e:
-        error_msg = str(e)
-        if "404" in error_msg:
-            st.error("🚨 API Path Error (404).")
-            st.info("Trying backup model: gemini-pro...")
-            # Fallback to the older stable model name if Flash is not recognized
-            try:
-                model_alt = genai.GenerativeModel('models/gemini-pro')
-                response_alt = model_alt.generate_content(prompt)
-                st.markdown(response_alt.text)
-            except Exception as e2:
-                st.error(f"Critical API Error: {e2}")
-        else:
-            st.error(f"Error: {error_msg}")
+        except Exception as e:
+            # This will show us if it's an API Key issue or a Network issue
+            st.error(f"Technical Error: {str(e)}")
+            st.info("Check your Streamlit Secrets for any extra spaces in the API Key.")
