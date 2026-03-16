@@ -1,11 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
-
 # --- 1. CLEAN API SETUP ---
 if "GEMINI_API_KEY" in st.secrets:
-    # REMOVED transport='rest' to fix the 404 URL error
+    # We use the default configuration to avoid the v1beta URL error
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
     st.error("❌ API Key Missing!")
@@ -45,35 +43,54 @@ m1, m2, m3 = st.columns(3)
 with m1: hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
 with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
 with m3: water_drunk = st.slider("Water Consumed (L)", 0.0, 5.0, 1.5)
-
 st.divider()
+# --- THE AI FOOD MENU (FIXED & RENAMED) ---
+st.subheader(f"🍱 AI {cuisine} Food Menu for {goal}")
 
-# --- THE AI FOOD MENU (FIXED 404) ---
-st.subheader(f"🍱 AI {cuisine} Menu for {goal}")
+if st.button("✨ Generate AI Food Menu"):
+    with st.spinner("Cura AI is preparing your personalized food menu..."):
+        # The prompt remains professional but the UI labels are now "Food Menu"
+        prompt = f"""
+        Act as a Nutritionist. Create a 1-day {cuisine} food menu for a {g}, {a}yrs, {w}kg. 
+        Goal: {goal}. Medical Context: {meds}. Vitals: BP {bp}, HR {hr}.
+        Target: {tdee} calories. 
+        Provide: Breakfast, Lunch, Dinner, and a Snack. 
+        Briefly explain why this menu fits the goal: {goal}.
+        """
 
-if st.button("✨ Generate AI Medical Menu"):
-    with st.spinner("Cura AI is connecting..."):
         try:
-            # Use the simplest model name possible
+            # Attempt 1: Standard Stable Model
             model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            prompt = f"""
-            Create a 1-day {cuisine} meal plan for a {g}, {a}yrs, {w}kg. 
-            Goal: {goal}. Medical: {meds}. Vitals: BP {bp}, HR {hr}.
-            Target: {tdee} calories. 
-            Include Breakfast, Lunch, Dinner, and why this helps {goal}.
-            """
-
             response = model.generate_content(prompt)
             
             if response.text:
                 st.markdown(response.text)
-                st.success("✅ Menu Generated!")
-                st.link_button(f"Order on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
-            else:
-                st.error("Empty response. Please try again.")
+                st.success("✅ Food Menu Generated!")
+                st.link_button("Order Ingredients on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
 
         except Exception as e:
-            # This will show us if it's an API Key issue or a Network issue
-            st.error(f"Technical Error: {str(e)}")
-            st.info("Check your Streamlit Secrets for any extra spaces in the API Key.")
+            error_str = str(e)
+            # This is the Auto-Recovery if the 404 error happens again
+            if "404" in error_str:
+                try:
+                    # Scan for any model your API key currently supports
+                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    # Pick the first 'flash' or 'pro' model found
+                    fallback_name = models[0] 
+                    
+                    model_alt = genai.GenerativeModel(fallback_name)
+                    response_alt = model_alt.generate_content(prompt)
+                    
+                    st.markdown(response_alt.text)
+                    st.success(f"✅ Food Menu Generated (via {fallback_name})")
+                except Exception as final_err:
+                    st.error("🚨 Connection Error. Please verify your API Key in Streamlit Secrets.")
+            else:
+                st.error(f"Technical Issue: {error_str}")
+
+# --- SIDEBAR RESTART ---
+if st.sidebar.button("🔄 Restart Profile"):
+    st.session_state.clear()
+    st.switch_page("cura.py")
+
+st.divider()
