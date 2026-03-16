@@ -27,15 +27,16 @@ except Exception as e:
 
 def get_gemini_response(prompt, image=None):
     """
-    Tries multiple model naming conventions to prevent 404 errors.
+    Fixed 404: Uses 2026 stable model names (Gemini 2.5/3 Flash).
     """
-    # Attempting the most stable naming conventions
-    model_names = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-pro"]
+    # Order of preference for 2026 stable models
+    # 'gemini-2.5-flash' is the current industry workhorse.
+    available_models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3-flash-preview"]
     
     last_error = ""
-    for name in model_names:
+    for model_id in available_models:
         try:
-            model = genai.GenerativeModel(model_name=name)
+            model = genai.GenerativeModel(model_name=model_id)
             if image:
                 response = model.generate_content([prompt, image])
             else:
@@ -43,9 +44,9 @@ def get_gemini_response(prompt, image=None):
             return response.text
         except Exception as e:
             last_error = str(e)
-            continue # Try the next model name in the list
+            continue # Try the next version if 404 or restricted
             
-    return f"Error connecting to Cura Brain: {last_error}"
+    return f"🚨 Cura Brain Error: All model attempts failed. {last_error}"
 
 # 2. DYNAMIC LOGIC ENGINE
 def calculate_metrics(w, h, a, g, goal, diseases):
@@ -60,13 +61,13 @@ def calculate_metrics(w, h, a, g, goal, diseases):
     
     # Precise Medical Adjustments
     if any(disease in diseases for disease in ["PCOD", "Thyroid"]):
-        tdee *= 0.85 # Higher metabolic resistance
+        tdee *= 0.85 
     
     # Dynamic Outputs
     prot = w * (2.2 if goal == "Weight Gain" else 1.6)
     water = w * 0.035
     steps = 11000 if goal == "Weight Loss" else 7500
-    sleep = "7-8 hours" if "BP" not in diseases else "8-9 hours (Essential for Hypertension control)"
+    sleep = "7-8 hours" if "BP" not in diseases else "8-9 hours (Essential for BP control)"
     
     return int(tdee), int(prot), round(water, 1), steps, sleep
 
@@ -107,10 +108,9 @@ with tab1:
     st.subheader(f"Custom {cuisine} Plan")
     if st.button("Generate Medical-Grade Menu"):
         with st.spinner("Cura AI is analyzing your nutritional needs..."):
-            prompt = f"""Generate a highly specific 1-day {cuisine} meal plan for {cal} calories. 
+            prompt = f"""Generate a 1-day {cuisine} meal plan for {cal} calories. 
             Medical constraints: {meds}. Primary Goal: {goal}. 
-            Include: Breakfast, Lunch, Snack, and Dinner. 
-            Highlight fiber and protein content for each."""
+            Include: Breakfast, Lunch, Snack, and Dinner. Highlight protein content."""
             menu = get_gemini_response(prompt)
             st.markdown(menu)
             
@@ -128,7 +128,7 @@ with tab2:
         st.image(img, caption="Analyzing your meal...", width=400)
         
         with st.spinner("Calculating calories..."):
-            v_prompt = f"Analyze this food image. Estimate calories, macros, and safety for a person with {meds} and goal of {goal}."
+            v_prompt = "Estimate calories and macros for this food. Is it safe for someone with " + str(meds) + "?"
             analysis = get_gemini_response(v_prompt, img)
             st.success(analysis)
 
@@ -138,9 +138,9 @@ with tab3:
     
     if today_w < float(weight):
         st.balloons()
-        st.success(f"Great progress! You've lost {round(weight - today_w, 2)}kg. Cura is recalibrating your targets...")
+        st.success(f"Great progress! Cura is recalibrating your targets...")
     elif today_w > float(weight):
-        st.warning("Weight increased slightly. Cura suggests increasing your step count by 2,000 for the next 2 days.")
+        st.warning("Weight increased. Cura suggests +2,000 steps daily for the next 48 hours.")
 
-    st.write("---")
-    st.caption("🔒 Cura Privacy Guarantee: Your health data stays in this session and is never sold.")
+st.write("---")
+st.caption("🔒 Cura Privacy Guarantee: Health data is processed in-session only.")
