@@ -1,59 +1,104 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(initial_sidebar_state="expanded")
+# Page Config
+st.set_page_config(page_title="Cura Dashboard", page_icon="📊", initial_sidebar_state="expanded")
 
-# 1. API Initialization with Error Handling
+# 1. API Configuration with Safety
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.error("❌ API Key Missing")
+    st.error("❌ API Key Missing! Please add GEMINI_API_KEY to Streamlit Secrets.")
 
-st.title("🛡️ Cura Dashboard")
+st.title("🛡️ Your Cura Health Hub")
 
-# 2. Retrieve session data
-w = st.session_state.get("weight", 70)
-h = st.session_state.get("height", 170)
+# --- DATA RETRIEVAL ---
+# We use .get() to avoid errors if the user skipped the onboarding
+w = st.session_state.get("weight", 70.0)
+h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
 g = st.session_state.get("gender", "Male")
 cuisine = st.session_state.get("cuisine", "Indian")
 meds = st.session_state.get("meds", ["None"])
+goal = st.session_state.get("goal", "Maintenance")
 
-# 3. Quick Calculations
+# --- LOGIC: CALORIE CALCULATION ---
+# Mifflin-St Jeor Equation
 s = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s
-tdee = int(bmr * 1.3)
+tdee = int(bmr * 1.3) # Assuming sedentary/light activity
 
-c1, c2, c3 = st.columns(3)
-c1.metric("Daily Calories", f"{tdee} kcal")
-c2.metric("Protein", f"{int(w * 1.6)}g")
-c3.metric("Water", f"{round(w * 0.035, 1)} L")
+# Adjust based on goal
+if goal == "Weight Loss":
+    tdee -= 500
+elif goal == "Weight Gain":
+    tdee += 400
+
+# --- UI: METRICS DISPLAY ---
+st.subheader("Your Daily Requirements")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Target Calories", f"{tdee} kcal")
+with col2:
+    # 1.6g protein per kg is a standard fitness goal
+    st.metric("Protein Goal", f"{int(w * 1.6)}g")
+with col3:
+    # 35ml water per kg
+    st.metric("Water Intake", f"{round(w * 0.035, 1)} L")
 
 st.divider()
 
-# 4. ROBUST AI MEAL PLAN GENERATION
-if st.button("🥘 Generate AI Meal Plan"):
-    # Using 1.5-flash as it is faster and less likely to timeout
-    model = genai.GenerativeModel("gemini-1.5-flash")
+# --- UI: AI MEAL PLANNER (The Fail-Safe Section) ---
+st.subheader(f"🥘 Personalized {cuisine} Menu")
+st.write(f"Tailored for {goal} and medical context: {', '.join(meds)}")
+
+if st.button("Generate AI Meal Plan"):
+    # Fix: Try multiple model names to avoid the 404 error
+    model_options = ["gemini-1.5-flash", "gemini-pro"]
     
     prompt = f"""
-    Create a 1-day {cuisine} meal plan for {tdee} calories. 
-    User medical context: {meds}. 
-    Provide Breakfast, Lunch, and Dinner with calorie estimates.
+    Act as a professional nutritionist. Create a 1-day {cuisine} diet plan for a {g} 
+    aged {a}, weighing {w}kg with the goal of {goal}. 
+    Medical conditions to consider: {meds}.
+    Total target calories: {tdee} kcal.
+    Provide Breakfast, Lunch, and Dinner with calorie estimates for each.
     """
     
-    with st.spinner("Connecting to Cura Brain..."):
-        try:
-            # We add a request_options timeout to prevent the 'grpc' error you saw
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": 600} # Increases wait time to 10 mins
-            )
-            if response.text:
-                st.markdown(response.text)
+    success = False
+    with st.spinner("Cura AI is searching for a stable model..."):
+        for model_name in model_options:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(
+                    prompt, 
+                    request_options={"timeout": 600}
+                )
+                if response.text:
+                    st.markdown(response.text)
+                    success = True
+                    break
+            except Exception as e:
+                # Silently try the next model if one fails
+                continue
+        
+        if not success:
+            st.error("🚨 Connection Error: All AI models are currently busy. Please try again in 30 seconds.")
+        else:
+            st.success("✅ Plan generated successfully!")
             
-            st.info("🔗 **Order Healthy Options:**")
-            st.link_button("Search Healthy Meals on Zomato", f"https://www.zomato.com/search?q=Healthy+food")
+            # --- UI: FOOD APP SUGGESTION ---
+            st.divider()
+            st.subheader("🔗 Order Healthy Options")
+            st.write("Don't have time to cook? Find matching healthy meals nearby:")
             
-        except Exception as e:
-            st.error(f"⚠️ Connection Error: The AI is taking too long to respond. Please try again in a moment. (Error: {str(e)})")
+            # Create a search query based on cuisine and health
+            search_query = f"Healthy {cuisine} food"
+            if "Diabetes" in meds:
+                search_query = "Sugar free healthy meals"
+            
+            st.link_button(f"Find on Zomato", f"https://www.zomato.com/search?q={search_query}")
+
+# --- RESET BUTTON ---
+st.sidebar.divider()
+if st.sidebar.button("🔄 Restart Profile"):
+    st.switch_page("cura.py")
