@@ -7,10 +7,11 @@ st.title("🛡️ Cura AI: Step 1")
 st.subheader("Physical Profile")
 
 # Save directly to session_state using 'key'
-st.number_input("Age", 15, 95, 25, key="age")
-st.selectbox("Gender", ["Male", "Female"], key="gender")
-st.number_input("Weight (kg)", 35.0, 180.0, 70.0, key="weight")
-st.number_input("Height (cm)", 100.0, 250.0, 170.0, key="height")
+# Example: In your first page
+st.number_input("Enter your Weight (kg)", min_value=30, max_value=200, value=70, key="weight")
+st.number_input("Enter your Height (cm)", min_value=100, max_value=250, value=170, key="height")
+st.number_input("Enter your Age", min_value=10, max_value=100, value=25, key="age")
+st.selectbox("Select Gender", ["Male", "Female"], key="gender")
 
 st.progress(20) # Progress bar
 
