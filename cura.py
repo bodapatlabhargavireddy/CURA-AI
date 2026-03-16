@@ -19,7 +19,7 @@ GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
 def get_gemini_response(prompt, image=None):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
     try:
         if image:
             response = model.generate_content([prompt, image])
