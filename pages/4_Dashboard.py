@@ -1,15 +1,19 @@
 import streamlit as st
 import google.generativeai as genai
+import os
 
+# 1. Page Config
 st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
 
-# API Setup
+# 2. Stronger API Configuration
+# Using 'rest' transport is the secret to stopping timeouts on public/expo WiFi
 if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
 else:
-    st.error("API Key Missing!")
+    st.error("❌ API Key Missing in Secrets!")
+    st.stop()
 
-st.title("🛡️ Cura Health Hub & Live Monitor")
+st.title("🛡️ Cura AI Health Hub")
 
 # --- DATA RETRIEVAL ---
 w = st.session_state.get("weight", 70.0)
@@ -20,84 +24,71 @@ cuisine = st.session_state.get("cuisine", "Indian")
 meds = st.session_state.get("meds", ["None"])
 goal = st.session_state.get("goal", "Maintenance")
 
-# --- CALCULATION LOGIC ---
+# --- CALCULATIONS ---
 s = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s
 tdee = int(bmr * 1.3)
 if "Weight Loss" in goal: tdee -= 500
 elif "Weight Gain" in goal: tdee += 400
 
-# --- FEATURE 1: 4 KEY METRICS ---
+# --- DISPLAY TOP METRICS ---
 st.subheader("🚀 Your Daily Health Targets")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("🔥 Calories", f"{tdee} kcal")
-c2.metric("💧 Water Goal", f"{round(w * 0.035, 1)} L")
-c3.metric("🍗 Protein", f"{int(w * 1.4)} g")
-c4.metric("👟 Step Goal", "10,000" if "BP" in goal or "PCOD" in goal else "8,000")
+c2.metric("💧 Water", f"{round(w * 0.035, 1)} L")
+c3.metric("🍗 Protein", f"{int(w * 1.5)} g")
+c4.metric("👟 Steps", "10,000" if "BP" in goal or "PCOD" in goal else "8,000")
 
 st.divider()
 
-# --- FEATURE 2: LIVE MONITORING (VITALS) ---
-st.subheader("💓 Real-Time Vitals Tracking")
-m_col1, m_col2, m_col3 = st.columns(3)
-
-with m_col1:
-    hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
-    if hr > 100: st.error("🚩 High Heart Rate Alert")
-with m_col2:
-    bp = st.number_input("Systolic BP (Upper)", 80, 200, 120)
-    if bp > 140: st.error("🚩 Hypertension Warning")
-with m_col3:
-    water_drunk = st.slider("Water Consumed (Liters)", 0.0, 5.0, 1.5, 0.25)
+# --- MONITORING INPUTS ---
+st.subheader("💓 Live Vitals")
+m1, m2, m3 = st.columns(3)
+with m1: hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
+with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
+with m3: water_drunk = st.slider("Water Consumed (L)", 0.0, 5.0, 1.5)
 
 st.divider()
 
-# --- FEATURE 3: AI FOOD MENU (ANTI-TIMEOUT VERSION) ---
-st.subheader(f"🍱 AI Generated {cuisine} Food Menu")
+# --- THE AI FOOD MENU ---
+st.subheader(f"🍱 AI {cuisine} Menu for {goal}")
 
-if st.button("Generate Medical-Grade Meal Plan"):
-    # 1. Faster Configuration
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest') # Use 'rest' for more stable connections
+if st.button("✨ Generate AI Medical Menu"):
+    # We use gemini-1.5-flash because it is the FASTEST model Google has.
+    # It responds in 2-3 seconds, preventing timeouts.
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
-    model = genai.GenerativeModel('gemini-1.5-flash') # Flash is 3x faster than Pro
+    # We make the prompt structured so the AI processes it faster
+    prompt = f"""
+    CONTEXT: Clinical Nutritionist Assistant
+    USER: {g}, {a}yrs, {w}kg. 
+    GOAL: {goal}. 
+    MEDICAL: {meds}. 
+    VITALS: BP {bp}, HR {hr}.
+    CUISINE: {cuisine}.
+    CALORIE TARGET: {tdee} kcal.
     
-    # 2. Optimized (Shorter) Prompt to reduce processing time
-    fast_prompt = f"""
-    Create a 1-day {cuisine} menu for {goal} ({tdee} cal). 
-    Context: {meds}, BP:{bp}, HR:{hr}.
-    Format: B/L/D with calories. Keep it concise.
+    TASK: Provide a 1-day meal menu (Breakfast, Lunch, Dinner, Snack).
+    Include calorie counts and WHY these foods help with {goal}.
     """
 
-    success = False
-    with st.spinner("⚡ Cura AI is optimizing connection..."):
+    with st.spinner("Cura AI is calculating..."):
         try:
-            # We wrap this in a 30-second timeout to give it enough time
+            # request_options adds a 60-second "wait" timer so it doesn't time out
             response = model.generate_content(
-                fast_prompt,
-                request_options={"timeout": 30} 
+                prompt,
+                request_options={"timeout": 60}
             )
             
             if response.text:
                 st.markdown(response.text)
-                st.success("✅ Menu Generated!")
-                success = True
+                st.success("✅ Personalized Menu Generated Successfully")
+                
+                # Zomato link
+                st.link_button(f"Order {cuisine} on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
+            else:
+                st.error("The AI reached a safety block. Please re-generate.")
+                
         except Exception as e:
-            # If AI fails, we show a 'Static' plan so you don't look bad at the Expo
-            st.error("🚨 AI is taking too long to respond.")
-            st.warning("🔄 Showing a high-speed backup plan instead:")
-            
-            # --- BACKUP PLAN (ALWAYS WORKS) ---
-            st.markdown(f"""
-            **High-Fiber {cuisine} Plan:**
-            * **Breakfast:** Sprouted grains or Oats (350 cal)
-            * **Lunch:** Grilled protein with {cuisine} spices & salad (600 cal)
-            * **Dinner:** Clear soup & steamed veggies (400 cal)
-            * **Health Tip:** Drink 500ml water before every meal for {goal}.
-            """)
-
-    if success:
-        st.link_button(f"Order Healthy {cuisine} on Zomato", f"https://www.zomato.com/search?q=healthy+{cuisine}")
-# Sidebar Navigation
-if st.sidebar.button("🔄 Restart Assessment"):
-    st.session_state.clear()
-    st.switch_page("cura.py")
+            st.error(f"Error: {str(e)}")
+            st.info("Check if your API Key is active in Google AI Studio.")
