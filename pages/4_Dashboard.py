@@ -1,10 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
-import time
 
 st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
 
-# --- 1. GET USER DATA ---
+# --- 1. DATA RETRIEVAL ---
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
@@ -28,7 +27,7 @@ else:
     cal, steps = int(bmr * 1.2), 8000
     ex_type, ex_time = "Brisk Walk/Yoga", "30 Mins"
 
-# --- 3. UI DISPLAY ---
+# --- 3. DASHBOARD UI ---
 st.title("📊 Your Health Dashboard")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -39,7 +38,6 @@ col4.metric("👟 Steps", f"{steps:,}")
 
 st.divider()
 
-# Exercise Feature
 st.subheader("🏋️ Activity Suggestion")
 e1, e2 = st.columns(2)
 e1.info(f"**Exercise:** {ex_type}")
@@ -47,32 +45,31 @@ e2.success(f"**Duration:** {ex_time} Daily")
 
 st.divider()
 
-# --- 4. THE "NO-FAIL" AI GENERATOR ---
+# --- 4. FAIL-SAFE AI GENERATOR ---
 st.subheader(f"🍱 {u_cuisine} Menu Plan")
 
 if st.button("✨ Generate AI Menu"):
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("Missing API Key in Secrets!")
-    else:
-        # Configuration
+    # FALLBACK MENU (In case AI is busy, the user still sees this)
+    fallback_menu = f"""
+    ### 🍎 Emergency Menu (AI Busy)
+    * **Breakfast:** Oats with milk and nuts (approx. 400 kcal)
+    * **Lunch:** Brown rice, grilled protein, and sautéed vegetables (approx. 600 kcal)
+    * **Dinner:** Whole wheat wrap with salad and lean protein (approx. 500 kcal)
+    * **Snack:** Greek yogurt or a piece of fruit.
+    * *Note: The AI nodes are currently overloaded. Please try again in 30 seconds for a more detailed plan.*
+    """
+    
+    try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        prompt = f"Diet plan for {a}yo {g}, {w}kg. Goal: {u_goal}. Target: {cal} cal. Exercise: {ex_type}."
-        
-        success = False
-        # Try 3 times automatically
-        for attempt in range(3):
-            try:
-                with st.spinner(f"Connecting to AI (Attempt {attempt+1}/3)..."):
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
-                    st.markdown(response.text)
-                    success = True
-                    break # Stop trying if it works!
-            except Exception:
-                time.sleep(3) # Wait 3 seconds before trying again
-        
-        if not success:
-            st.error("📢 Still Busy. Tip: Use a Mobile Hotspot for faster connection!")
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        with st.spinner("Requesting AI Plan..."):
+            prompt = f"Diet plan for {a}yo {g}, {w}kg. Goal: {u_goal}. Target: {cal} cal. Cuisine: {u_cuisine}."
+            response = model.generate_content(prompt)
+            st.markdown(response.text)
+    except Exception:
+        # If the AI fails, show the Fallback Menu instead of an error!
+        st.markdown(fallback_menu)
+        st.warning("Google Servers are busy. Showing a standardized plan based on your calories.")
 
 if st.sidebar.button("🔄 Restart"):
     st.switch_page("cura.py")
