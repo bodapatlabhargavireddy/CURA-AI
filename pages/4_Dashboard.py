@@ -3,68 +3,94 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
 
-# --- 1. PULL DATA FROM MEMORY ---
-# These variables now grab exactly what the user typed on page 1
-u_weight = st.session_state.get("weight", 70.0)
-u_height = st.session_state.get("height", 170.0)
-u_age = st.session_state.get("age", 25)
-u_gender = st.session_state.get("gender", "Male")
-u_goal = st.session_state.get("goal", "Maintenance")
+# --- 1. API CONFIG ---
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("API Key Missing!")
 
-# --- 2. THE MATH (THIS MAKES VALUES DIFFERENT FOR EVERYONE) ---
-# Mifflin-St Jeor Formula
-s = 5 if u_gender == "Male" else -161
-bmr = (10 * u_weight) + (6.25 * u_height) - (5 * u_age) + s
+# --- 2. DATA RETRIEVAL (PULLING FROM SETUP PAGE) ---
+# We use .get() to avoid errors if the user skips the setup page
+w = st.session_state.get("weight", 70.0)
+h = st.session_state.get("height", 170.0)
+a = st.session_state.get("age", 25)
+g = st.session_state.get("gender", "Male")
+goal = st.session_state.get("goal", "Maintenance")
+cuisine = st.session_state.get("cuisine", "Indian")
 
-# Calculate Calories based on goal
-if "Weight Loss" in u_goal:
-    total_calories = int(bmr * 1.2) - 500
+# --- 3. DYNAMIC CALCULATIONS ---
+# These change for EVERY user based on their input
+s_val = 5 if g == "Male" else -161
+bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
+
+# Adjust Calories and Steps based on Goal
+if goal == "Weight Loss":
+    tdee = int(bmr * 1.2) - 500
     steps = 10000
-elif "Weight Gain" in u_goal:
-    total_calories = int(bmr * 1.2) + 400
+elif goal == "Weight Gain":
+    tdee = int(bmr * 1.2) + 400
     steps = 6000
 else:
-    total_calories = int(bmr * 1.2)
+    tdee = int(bmr * 1.2)
     steps = 8000
 
-# Calculate Water (35ml per kg)
-water = round(u_weight * 0.035, 1)
+water = round(w * 0.035, 1)
+protein = int(w * 1.6)
 
-# Calculate Protein (1.6g per kg)
-protein = int(u_weight * 1.6)
-
-# --- 3. DISPLAY THE UNIQUE METRICS ---
+# --- 4. UI DISPLAY ---
 st.title("🛡️ Your Personalized Cura Hub")
-st.info(f"Showing results for: {u_weight}kg, {u_height}cm, {u_gender}")
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("🔥 Daily Calories", f"{total_calories} kcal")
-c2.metric("💧 Water Intake", f"{water} L")
-c3.metric("🍗 Protein Goal", f"{protein} g")
-c4.metric("👟 Step Goal", f"{steps:,}")
+# Visual confirmation that the code is reading YOUR inputs
+st.info(f"📋 Profile: {w}kg | {h}cm | {g} | Goal: {goal}")
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("🔥 Daily Calories", f"{tdee} kcal")
+col2.metric("💧 Water Intake", f"{water} L")
+col3.metric("🍗 Protein Goal", f"{protein} g")
+col4.metric("👟 Step Goal", f"{steps:,}")
 
 st.divider()
 
-# --- 4. LIVE MONITORING & PROGRESS ---
-st.subheader("💓 Real-Time Vitals")
+# --- 5. MONITORING & PROGRESS ---
+st.subheader("💓 Live Vitals")
 m1, m2, m3 = st.columns(3)
 with m1: hr = st.number_input("Heart Rate (BPM)", 40, 200, 72)
 with m2: bp = st.number_input("Systolic BP", 80, 200, 120)
 with m3: 
-    current_w = st.number_input("Log Today's Weight (kg)", 30.0, 200.0, float(u_weight))
-    # AI logic: Did weight change?
-    diff = round(current_w - u_weight, 2)
+    # Compare original weight with today's weight
+    current_w = st.number_input("Log Today's Weight (kg)", 30.0, 200.0, float(w))
+    diff = round(current_w - w, 2)
     if diff != 0: st.write(f"Weight Change: {diff} kg")
 
-# --- 5. AI FOOD MENU ---
-if st.button("🍱 Generate My Food Menu"):
-    # This ensures the AI also sees the UNIQUE values
-    prompt = f"Create a {u_goal} meal plan for {u_weight}kg, {u_gender}, BP {bp}, HR {hr}. Target {total_calories} cal."
-    
-    try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        st.markdown(response.text)
-    except:
-        st.error("AI Node Busy.")
+st.divider()
+
+# --- 6. AI FOOD MENU ---
+st.subheader(f"🍱 Personalized {cuisine} Food Menu")
+
+if st.button("✨ Generate AI Food Menu"):
+    with st.spinner("AI is analyzing your profile..."):
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # This prompt ensures the AI uses the UNIQUE data
+            prompt = f"""
+            Act as a Nutritionist. 
+            User: {g}, {a}yrs, {w}kg (current: {current_w}kg). 
+            Goal: {goal}. Cuisine: {cuisine}.
+            Vitals: BP {bp}, HR {hr}. Target: {tdee} calories.
+            Provide a 1-day food menu (Breakfast, Lunch, Dinner, Snack).
+            """
+            
+            response = model.generate_content(prompt)
+            st.markdown(response.text)
+            st.success("✅ Menu created for your unique profile!")
+            
+        except Exception as e:
+            st.error("AI Node Busy. Trying backup...")
+            # Simple fallback to gemini-pro if flash is busy
+            try:
+                model_alt = genai.GenerativeModel('gemini-pro')
+                res = model_alt.generate_content(prompt)
+                st.markdown(res.text)
+            except:
+                st.error("Connection Error. Check API Key.")
