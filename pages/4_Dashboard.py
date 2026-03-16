@@ -1,14 +1,46 @@
 import streamlit as st
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# Page Config
-st.set_page_config(page_title="Cura Dashboard", page_icon="📊", initial_sidebar_state="expanded")
+# ... (Calculations and Metrics stay the same as previous)
 
-# 1. API Configuration with Safety
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-else:
-    st.error("❌ API Key Missing! Please add GEMINI_API_KEY to Streamlit Secrets.")
+if st.button("🥘 Generate AI Meal Plan"):
+    # List of models - including the exact 'v1' strings
+    model_options = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+    
+    # Safety settings can often be the reason for "Blocked" or "Busy" errors
+    safety_settings = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    }
+
+    prompt = f"Create a {st.session_state.get('cuisine')} meal plan for {tdee} calories. Conditions: {st.session_state.get('meds')}."
+
+    success = False
+    with st.spinner("Cura AI is forcing a connection..."):
+        for model_name in model_options:
+            try:
+                # Initialize model with safety settings
+                model = genai.GenerativeModel(model_name=model_name)
+                response = model.generate_content(
+                    prompt,
+                    safety_settings=safety_settings,
+                    request_options={"timeout": 1000} # Very long timeout
+                )
+                
+                if response:
+                    st.markdown(response.text)
+                    success = True
+                    break
+            except Exception as e:
+                # Debugging info (remove this before the actual expo)
+                # st.write(f"Tried {model_name}: {str(e)}") 
+                continue
+        
+        if not success:
+            st.error("🚨 Critical Error: Please check if your GEMINI_API_KEY is active in the Google AI Studio dashboard.")
 
 st.title("🛡️ Your Cura Health Hub")
 
