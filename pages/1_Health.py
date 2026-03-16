@@ -10,4 +10,4 @@ st.multiselect("Select any active conditions:",
 st.progress(25)
 
 if st.button("Next: Set Your Goal 🎯"):
-    st.switch_page("pages/2_Goal.py") # Ensure filename matches exactly
+    st.switch_page("pages/2_Goals.py") # Ensure filename matches exactly
