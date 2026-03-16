@@ -6,7 +6,7 @@ st.title("🎯 Step 4: Your Goal")
 
 # Capture the goal in session_state
 st.selectbox("What is your primary target?", 
-             ["Maintenance", "Weight Loss", "Weight Gain", "Manage PCOD/PCOS", "Diabetes Control"], 
+             ["Maintenance", "Weight Loss", "Weight Gain", "Manage PCOD/PCOS", "Diabetes Control","Thyroid Control",BP Control], 
              key="goal")
 
 st.progress(80)
