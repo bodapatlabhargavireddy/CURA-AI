@@ -3,7 +3,7 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="Cura AI Dashboard", layout="wide")
 
-# --- 1. DATA RETRIEVAL ---
+# --- 1. DATA RETRIEVAL (Ensures inputs are updated) ---
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
@@ -11,12 +11,15 @@ g = st.session_state.get("gender", "Male")
 u_goal = st.session_state.get("goal", "Maintenance")
 u_cuisine = st.session_state.get("cuisine", "Indian")
 
-# --- 2. CALCULATIONS ---
+# --- 2. DYNAMIC CALCULATIONS ---
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
+
+# Water & Protein
 water = round(w * 0.035, 1)
 protein = int(w * 1.6)
 
+# Goal-based logic
 if "Loss" in u_goal:
     cal, steps = int(bmr * 1.2) - 500, 10000
     ex_type, ex_time = "Cardio (Running/Cycling)", "45-60 Mins"
@@ -27,49 +30,72 @@ else:
     cal, steps = int(bmr * 1.2), 8000
     ex_type, ex_time = "Brisk Walk/Yoga", "30 Mins"
 
-# --- 3. DASHBOARD UI ---
-st.title("📊 Your Health Dashboard")
+# --- 3. UI DISPLAY ---
+st.title("🛡️ Cura AI: Your Personal Hub")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("🔥 Calories", f"{cal} kcal")
-col2.metric("💧 Water", f"{water} L")
-col3.metric("🍗 Protein", f"{protein} g")
-col4.metric("👟 Steps", f"{steps:,}")
+# Metrics row
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("🔥 Daily Calories", f"{cal} kcal")
+c2.metric("💧 Water Intake", f"{water} L")
+c3.metric("🍗 Protein Goal", f"{protein} g")
+c4.metric("👟 Step Goal", f"{steps:,}")
 
 st.divider()
 
+# Exercise Section
 st.subheader("🏋️ Activity Suggestion")
 e1, e2 = st.columns(2)
-e1.info(f"**Exercise:** {ex_type}")
-e2.success(f"**Duration:** {ex_time} Daily")
+e1.info(f"**Recommended Exercise:** {ex_type}")
+e2.success(f"**Required Duration:** {ex_time} Daily")
 
 st.divider()
 
-# --- 4. FAIL-SAFE AI GENERATOR ---
-st.subheader(f"🍱 {u_cuisine} Menu Plan")
+# --- 4. THE PROPER AI GENERATOR ---
+st.subheader(f"🍱 Personalized {u_cuisine} Menu")
 
-if st.button("✨ Generate AI Menu"):
-    # FALLBACK MENU (In case AI is busy, the user still sees this)
-    fallback_menu = f"""
-    ### 🍎 Emergency Menu (AI Busy)
-    * **Breakfast:** Oats with milk and nuts (approx. 400 kcal)
-    * **Lunch:** Brown rice, grilled protein, and sautéed vegetables (approx. 600 kcal)
-    * **Dinner:** Whole wheat wrap with salad and lean protein (approx. 500 kcal)
-    * **Snack:** Greek yogurt or a piece of fruit.
-    * *Note: The AI nodes are currently overloaded. Please try again in 30 seconds for a more detailed plan.*
-    """
-    
-    try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        with st.spinner("Requesting AI Plan..."):
-            prompt = f"Diet plan for {a}yo {g}, {w}kg. Goal: {u_goal}. Target: {cal} cal. Cuisine: {u_cuisine}."
-            response = model.generate_content(prompt)
-            st.markdown(response.text)
-    except Exception:
-        # If the AI fails, show the Fallback Menu instead of an error!
-        st.markdown(fallback_menu)
-        st.warning("Google Servers are busy. Showing a standardized plan based on your calories.")
+if st.button("✨ Generate My Custom Menu"):
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.error("API Key missing! Please add it to Streamlit Secrets.")
+    else:
+        with st.spinner("AI is calculating your diet plan..."):
+            try:
+                # Proper Configuration
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # Using 1.5-Flash for speed
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                # A "Proper" Prompt that AI understands easily
+                prompt = f"""
+                You are a professional nutritionist. Provide a 1-day {u_cuisine} meal plan.
+                User Details: {g}, {a} years old, {w}kg weight.
+                Health Goal: {u_goal}.
+                Daily Calorie Target: {cal} kcal.
+                Activity Level: {ex_time} of {ex_type}.
+                Format the output with Breakfast, Lunch, Dinner, and a Snack. 
+                Include approximate calories for each meal.
+                """
+                
+                # Safety settings to prevent blocking
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        max_output_tokens=800,
+                    )
+                )
+                
+                if response.text:
+                    st.markdown(response.text)
+                    st.balloons()
+                else:
+                    st.error("AI returned an empty response. Try clicking again.")
+                    
+            except Exception as e:
+                # Handle the specific 'Busy' error with a retry message
+                st.error("🚨 The AI server is currently overloaded.")
+                st.info("💡 **Expo Tip:** This happens when many people use the same API key. Wait 10 seconds and try one more time!")
 
-if st.sidebar.button("🔄 Restart"):
+# Sidebar navigation
+if st.sidebar.button("🔄 Restart Setup"):
     st.switch_page("cura.py")
