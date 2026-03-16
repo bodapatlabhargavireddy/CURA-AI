@@ -1,19 +1,16 @@
 import streamlit as st
 
-st.set_page_config(page_title="Cura AI", initial_sidebar_state="collapsed")
-st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
+st.set_page_config(page_title="Cura AI - Setup", layout="centered")
 
-st.title("🛡️ Cura AI: Step 1")
-st.subheader("Physical Profile")
+st.title("🛡️ Setup Your Health Profile")
 
-# Save directly to session_state using 'key'
-# Example: In your first page
-st.number_input("Enter your Weight (kg)", min_value=30, max_value=200, value=70, key="weight")
-st.number_input("Enter your Height (cm)", min_value=100, max_value=250, value=170, key="height")
-st.number_input("Enter your Age", min_value=10, max_value=100, value=25, key="age")
-st.selectbox("Select Gender", ["Male", "Female"], key="gender")
+# Using 'key' is mandatory so the Dashboard can see these values
+st.number_input("Weight (kg)", min_value=30.0, max_value=200.0, value=70.0, key="weight")
+st.number_input("Height (cm)", min_value=100.0, max_value=250.0, value=170.0, key="height")
+st.number_input("Age", min_value=10, max_value=100, value=25, key="age")
+st.selectbox("Gender", ["Male", "Female"], key="gender")
+st.selectbox("Goal", ["Maintenance", "Weight Loss", "Weight Gain"], key="goal")
+st.selectbox("Cuisine Preference", ["Indian", "Continental", "Mediterranean"], key="cuisine")
 
-st.progress(20) # Progress bar
-
-if st.button("Next: Health Profile ➡️"):
-    st.switch_page("pages/1_Health.py")
+if st.button("Go to Dashboard 🚀"):
+    st.switch_page("pages/4_Dashboard.py")
