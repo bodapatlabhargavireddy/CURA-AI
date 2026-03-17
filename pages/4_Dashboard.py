@@ -1,9 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
+import time
 
 st.set_page_config(page_title="Cura AI Pro", layout="wide")
 
-# 1. FETCH DATA
+# 1. DATA RECOVERY
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
@@ -11,59 +12,128 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. CALCULATE BMI & VITALS
+# 2. INSTANT CALCULATIONS
 bmi = round(w / ((h/100)**2), 1)
-status = "Healthy"
-if bmi < 18.5: status = "Underweight"
-elif bmi >= 25 and bmi < 30: status = "Overweight"
-elif bmi >= 30: status = "Obese"
+status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
 
-# 3. INTERACTIVE INTENSITY & STEP LOGIC
 st.title("🛡️ Cura AI: Performance Coach")
 intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
-# Logic Mapping for Steps and Multipliers
-if intensity == "Rest":
-    mult, water_add, prot_rate, steps = 1.2, 0.0, 1.2, 4000
-elif intensity == "Light":
-    mult, water_add, prot_rate, steps = 1.375, 0.5, 1.4, 7000
-elif intensity == "Moderate":
-    mult, water_add, prot_rate, steps = 1.55, 1.0, 1.8, 10000
-else: # Heavy
-    mult, water_add, prot_rate, steps = 1.725, 1.5, 2.2, 15000
+# Logic for Step Count and Multipliers
+i_map = {
+    "Rest": {"m": 1.2, "w": 0.0, "p": 1.2, "s": 4000},
+    "Light": {"m": 1.375, "w": 0.5, "p": 1.4, "s": 7000},
+    "Moderate": {"m": 1.55, "w": 1.0, "p": 1.8, "s": 10000},
+    "Heavy": {"m": 1.725, "w": 1.5, "p": 2.2, "s": 15000}
+}
+lvl = i_map[intensity]
 
-# Final Calculations
+# Math Engine
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
-cal_target = int(bmr * mult) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
-prot_target = int(w * prot_rate)
-water_target = round((w * 0.035) + water_add, 1)
+cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
+prot = int(w * lvl["p"])
+wat = round((w * 0.035) + lvl["w"], 1)
 
-# 4. DISPLAY DASHBOARD
+# 3. DASHBOARD DISPLAY
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("🔥 Calories", f"{cal_target} kcal")
-c2.metric("🍗 Protein", f"{prot_target} g")
-c3.metric("💧 Water", f"{water_target} L")
-c4.metric("👟 Steps", f"{steps:,}")
+c1.metric("🔥 Calories", f"{cal} kcal")
+c2.metric("🍗 Protein", f"{prot} g")
+c3.metric("💧 Water", f"{wat} L")
+c4.metric("👟 Step Goal", f"{lvl['s']:,}")
 
-st.info(f"**BMI:** {bmi} ({status}) | **Today's Goal:** {intensity} Activity")
+st.info(f"📊 **BMI:** {bmi} ({status}) | **Intensity:** {intensity}")
 
-# 5. FIXED AI COACH (Workout + Diet)
+# 4. EXPO-STABLE AI COACH
 st.divider()
-if st.button("🚀 Generate My AI Coaching Plan"):
+if st.button("🚀 Generate AI Coaching Plan"):
     if "GEMINI_API_KEY" not in st.secrets:
-        st.error("Missing API Key in Secrets!")
+        st.error("Add GEMINI_API_KEY to your Streamlit Secrets!")
     else:
-        with st.spinner("AI Coach is building your plan..."):
-            try:
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                
-                # Single-line prompt to prevent parsing errors
-                prompt = f"Diet and Workout Coach for {g}, {a}yo, {w}kg. BMI {bmi}, Goal {goal}, {intensity} intensity. Suggest 45m workout and {cuisine} menu for {cal_target}cal and {prot_target}g protein."
-                
-                res = model.generate_content(prompt, generation_config={"temperature": 0.2, "max_output_tokens": 600})
-                st.markdown(res.text)
-                st.balloons()
-            except:
-                st.error("AI Busy. Please wait 10s and try again.")
+        with st.spinner("AI Coach is analyzing your vitals..."):
+            success = False
+            for attempt in range(3): # It will try 3 times automatically
+                try:
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = f"Coach for {g}, {a}y, {w}kg. BMI {bmi}, Goal {goal}, {intensity} activity. Suggest 45m workout and {cuisine} menu for {cal}kcal, {prot}g protein."
+                    
+                    res = model.generate_content(prompt)
+                    st.markdown(res.text)
+                    st.balloons()
+                    success = True
+                    break 
+                except Exception:
+                    time.sleep(2) # Wait 2 seconds before retrying
+            
+            if not success:
+                st.error("The AI is currently swamped with requests. Since your stats are already calculated above, you can still present your dashboard!")import streamlit as st
+import google.generativeai as genai
+import time
+
+st.set_page_config(page_title="Cura AI Pro", layout="wide")
+
+# 1. DATA RECOVERY
+w = st.session_state.get("weight", 70.0)
+h = st.session_state.get("height", 170.0)
+a = st.session_state.get("age", 25)
+g = st.session_state.get("gender", "Male")
+goal = st.session_state.get("goal", "Weight Loss")
+cuisine = st.session_state.get("cuisine", "Indian")
+
+# 2. INSTANT CALCULATIONS
+bmi = round(w / ((h/100)**2), 1)
+status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
+
+st.title("🛡️ Cura AI: Performance Coach")
+intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
+
+# Logic for Step Count and Multipliers
+i_map = {
+    "Rest": {"m": 1.2, "w": 0.0, "p": 1.2, "s": 4000},
+    "Light": {"m": 1.375, "w": 0.5, "p": 1.4, "s": 7000},
+    "Moderate": {"m": 1.55, "w": 1.0, "p": 1.8, "s": 10000},
+    "Heavy": {"m": 1.725, "w": 1.5, "p": 2.2, "s": 15000}
+}
+lvl = i_map[intensity]
+
+# Math Engine
+s_val = 5 if g == "Male" else -161
+bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
+cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
+prot = int(w * lvl["p"])
+wat = round((w * 0.035) + lvl["w"], 1)
+
+# 3. DASHBOARD DISPLAY
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("🔥 Calories", f"{cal} kcal")
+c2.metric("🍗 Protein", f"{prot} g")
+c3.metric("💧 Water", f"{wat} L")
+c4.metric("👟 Step Goal", f"{lvl['s']:,}")
+
+st.info(f"📊 **BMI:** {bmi} ({status}) | **Intensity:** {intensity}")
+
+# 4. EXPO-STABLE AI COACH
+st.divider()
+if st.button("🚀 Generate AI Coaching Plan"):
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.error("Add GEMINI_API_KEY to your Streamlit Secrets!")
+    else:
+        with st.spinner("AI Coach is analyzing your vitals..."):
+            success = False
+            for attempt in range(3): # It will try 3 times automatically
+                try:
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = f"Coach for {g}, {a}y, {w}kg. BMI {bmi}, Goal {goal}, {intensity} activity. Suggest 45m workout and {cuisine} menu for {cal}kcal, {prot}g protein."
+                    
+                    res = model.generate_content(prompt)
+                    st.markdown(res.text)
+                    st.balloons()
+                    success = True
+                    break 
+                except Exception:
+                    time.sleep(2) # Wait 2 seconds before retrying
+            
+            if not success:
+                st.error("The AI is currently swamped with requests. Since your stats are already calculated above, you can still present your dashboard!")
