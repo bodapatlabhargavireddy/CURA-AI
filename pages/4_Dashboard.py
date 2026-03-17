@@ -1,4 +1,4 @@
-[10:20, 17/03/2026] Bhargavi Reddy: import streamlit as st
+import streamlit as st
 
 st.set_page_config(page_title="Cura AI", initial_sidebar_state="collapsed")
 st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
