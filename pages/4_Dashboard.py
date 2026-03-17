@@ -92,7 +92,7 @@ if st.button("🚀 Generate AI Workout & Meal Plan"):
         with st.spinner("🤖 AI Coach Thinking..."):
 
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-2.0-flash")
 
                 prompt = f"""
                 User Profile:
