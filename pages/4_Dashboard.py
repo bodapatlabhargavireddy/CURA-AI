@@ -51,7 +51,9 @@ if st.button("🚀 Generate AI Workout & Meal Plan"):
         with st.spinner("AI is connecting to servers..."):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                
+                # Use the correct model name from list_models()
+                model = genai.GenerativeModel("models/gemini-1.5-flash")
 
                 prompt = (
                     f"Provide a 1-day {cuisine} meal menu and a 45min workout "
@@ -70,7 +72,6 @@ if st.button("🚀 Generate AI Workout & Meal Plan"):
 
             except Exception as e:
                 st.error(f"AI Server Error: {e}")
-                st.warning("Tip: The nutrition and fitness metrics above are calculated locally and always accurate!")
 
 if st.sidebar.button("🔄 Restart"):
     st.switch_page("cura.py")
