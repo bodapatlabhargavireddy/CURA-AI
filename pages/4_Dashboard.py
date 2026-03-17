@@ -19,10 +19,10 @@ st.title("🛡️ Cura AI: Performance Coach")
 intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
 i_map = {
-    "Rest": {"m": 1.2, "p": 1.2, "f": 0.30, "s": 4000},
-    "Light": {"m": 1.375, "p": 1.5, "f": 0.25, "s": 7000},
-    "Moderate": {"m": 1.55, "p": 1.8, "f": 0.25, "s": 10000},
-    "Heavy": {"m": 1.725, "p": 2.2, "f": 0.20, "s": 15000}
+    "Rest": {"m": 1.2, "p": 1.2, "f": 0.30, "s": 4000},
+    "Light": {"m": 1.375, "p": 1.5, "f": 0.25, "s": 7000},
+    "Moderate": {"m": 1.55, "p": 1.8, "f": 0.25, "s": 10000},
+    "Heavy": {"m": 1.725, "p": 2.2, "f": 0.20, "s": 15000}
 }
 lvl = i_map[intensity]
 
@@ -47,35 +47,35 @@ st.divider()
 
 # 4. THE UNIVERSAL AI DISCOVERY CALL
 if st.button("🚀 Generate AI Workout & Meal Plan"):
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("Missing API Key!")
-    else:
-        with st.spinner("Searching for compatible AI engine..."):
-            try:
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                
-                # Automatically find the right model name for your key
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                
-                if not available_models:
-                    st.error("No compatible models found for this API key.")
-                else:
-                    # Try the first available model (usually flash or pro)
-                    target_model = available_models[0]
-                    model = genai.GenerativeModel(target_model)
-                    
-                    prompt = (f"Coach: 1-day {cuisine} menu and 45m workout for {g}, {w}kg. "
-                              f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
-                              f"Target: {cal}cal, {prot}g protein, {fat_g}g fat.")
-                    
-                    response = model.generate_content(prompt)
-                    st.success(f"✅ Generated using {target_model}")
-                    st.markdown(response.text)
-                    st.balloons()
-                    
-            except Exception as e:
-                st.error(f"Final Attempt Error: {str(e)}")
-                st.warning("Presentation Tip: Show the judges the live metrics above—they are 100% accurate!")
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.error("Missing API Key!")
+    else:
+        with st.spinner("Searching for compatible AI engine..."):
+            try:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # Automatically find the right model name for your key
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                if not available_models:
+                    st.error("No compatible models found for this API key.")
+                else:
+                    # Try the first available model (usually flash or pro)
+                    target_model = available_models[0]
+                    model = genai.GenerativeModel(target_model)
+                    
+                    prompt = (f"Coach: 1-day {cuisine} menu and 45m workout for {g}, {w}kg. "
+                              f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
+                              f"Target: {cal}cal, {prot}g protein, {fat_g}g fat.")
+                    
+                    response = model.generate_content(prompt)
+                    st.success(f"✅ Generated using {target_model}")
+                    st.markdown(response.text)
+                    st.balloons()
+                    
+            except Exception as e:
+                st.error(f"Final Attempt Error: {str(e)}")
+                st.warning("Presentation Tip: Show the judges the live metrics above—they are 100% accurate!")
 
 if st.sidebar.button("🔄 Restart"):
-    st.switch_page("cura.py")
+    st.switch_page("cura.py") 
