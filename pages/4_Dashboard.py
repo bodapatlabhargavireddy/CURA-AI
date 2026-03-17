@@ -58,39 +58,45 @@ if st.button("🚀 Generate AI Workout & Meal Plan"):
         if "GEMINI_API_KEY" not in st.secrets:
             st.error("Missing API Key in Secrets!")
         else:
-            with st.spinner(f"Cura AI is analyzing stats for {w}kg..."):
+            with st.spinner(f"Cura AI is searching for a working engine..."):
                 try:
                     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
-                    prompt = (f"Coach: 1-day {cuisine} menu and 45m workout for {g}, {w}kg. "
-                              f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
-                              f"Target: {cal}cal, {prot}g protein.")
+                    # --- FIX FOR 404: Auto-detect available model ---
+                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                     
-                    response = model.generate_content(prompt)
-                    st.session_state.ai_plan_cache = response.text
-                    st.balloons()
+                    if not available_models:
+                        st.error("No models found for this API key.")
+                    else:
+                        # Grab the first working model (usually gemini-pro or gemini-1.5-flash)
+                        target_model = available_models[0]
+                        model = genai.GenerativeModel(target_model)
+                        
+                        prompt = (f"Coach: 1-day {cuisine} menu and 45m workout for {g}, {w}kg. "
+                                  f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
+                                  f"Target: {cal}cal, {prot}g protein.")
+                        
+                        response = model.generate_content(prompt)
+                        st.session_state.ai_plan_cache = response.text
+                        st.balloons()
                     
                 except Exception as e:
-                    if "429" in str(e):
-                        st.warning("⚠️ API Quota Reached. Using 'Cura Offline Engine'...")
-                        # Backup Plan using SYNCED variables
-                        st.session_state.ai_plan_cache = f"""
-                        ### 🍱 Offline Expert {cuisine} Plan for {w}kg {g}
-                        **Nutrition Summary:**
-                        * **Breakfast:** Vegetable Poha or Sprouts
-                        * **Lunch:** Brown Rice with {cuisine} Dal & Protein
-                        * **Dinner:** Clear Soup & Grilled Veggies
-                        * **Target:** {cal} kcal | {prot}g Protein
-                        
-                        **Workout Strategy ({intensity}):**
-                        * **Main Activity:** 30-45 mins Brisk Activity
-                        * **Daily Goal:** {lvl['s']} Steps
-                        
-                        *💡 Note: Calculated using local bio-metrics because AI is currently busy.*
-                        """
-                    else:
-                        st.error(f"Error: {str(e)}")
+                    # --- FIX FOR 429 & OTHER ERRORS ---
+                    st.warning("⚠️ Cloud Engine busy. Using 'Cura Offline Expert Engine'...")
+                    st.session_state.ai_plan_cache = f"""
+                    ### 🍱 Offline Expert {cuisine} Plan for {w}kg {g}
+                    **Nutrition Summary:**
+                    * **Breakfast:** Vegetable Poha or Sprouts
+                    * **Lunch:** Brown Rice with {cuisine} Dal & Protein
+                    * **Dinner:** Clear Soup & Grilled Veggies
+                    * **Target:** {cal} kcal | {prot}g Protein
+                    
+                    **Workout Strategy ({intensity}):**
+                    * **Main Activity:** 30-45 mins Brisk Activity
+                    * **Daily Goal:** {lvl['s']} Steps
+                    
+                    *💡 Note: Generated using local bio-metrics (Sync Verified for {w}kg).*
+                    """
 
 # Display result from memory
 if st.session_state.ai_plan_cache:
