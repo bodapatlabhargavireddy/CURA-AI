@@ -11,65 +11,60 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. THE SCIENCE ENGINE (Local & Instant)
+# 2. THE SCIENCE ENGINE (BMI & Body Fat)
 bmi = round(w / ((h/100)**2), 1)
 status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
 
-st.title("🛡️ Cura AI: Total Coach")
-intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
+st.title("🛡️ Cura AI: Total Performance Coach")
+intensity = st.select_slider("Today's Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
-# Logic for dynamic scaling
+# 3. DYNAMIC SCALING LOGIC
+# Mapping: Multiplier, Water Extra, Protein g/kg, Fat % of Calories, Steps, Workout Type
 i_map = {
-    "Rest": {"m": 1.2, "w": 0.0, "p": 1.2, "s": 4000, "work": "Active Recovery / Stretching"},
-    "Light": {"m": 1.375, "w": 0.5, "p": 1.4, "s": 7000, "work": "Brisk Walking or Yoga"},
-    "Moderate": {"m": 1.55, "w": 1.0, "p": 1.8, "s": 10000, "work": "Weight Training or Steady Cardio"},
-    "Heavy": {"m": 1.725, "w": 1.5, "p": 2.2, "s": 15000, "work": "HIIT or Heavy Strength Circuit"}
+    "Rest": {"m": 1.2, "w": 0.0, "p": 1.2, "f": 0.30, "s": 4000, "ex": "Mobility & Stretching"},
+    "Light": {"m": 1.375, "w": 0.5, "p": 1.4, "f": 0.25, "s": 7000, "ex": "Brisk Walk & Yoga"},
+    "Moderate": {"m": 1.55, "w": 1.0, "p": 1.8, "f": 0.25, "s": 10000, "ex": "Gym Training / Cardio"},
+    "Heavy": {"m": 1.725, "w": 1.5, "p": 2.2, "f": 0.20, "s": 15000, "ex": "HIIT & Heavy Lifting"}
 }
 lvl = i_map[intensity]
 
-# Calculations
+# Math Engine
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
 cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
+
+# Macro Calculation
 prot = int(w * lvl["p"])
+fat_cals = cal * lvl["f"]
+fat_grams = int(fat_cals / 9) # 9 calories per gram of fat
 water = round((w * 0.035) + lvl["w"], 1)
 
-# 3. DISPLAY DASHBOARD
+# 4. DISPLAY DASHBOARD
+
+
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("⚖️ BMI", f"{bmi} ({status})")
-c2.metric("🔥 Calories", f"{cal} kcal")
-c3.metric("🍗 Protein", f"{prot} g")
+c1.metric("🔥 Calories", f"{cal} kcal")
+c2.metric("🍗 Protein", f"{prot} g")
+c3.metric("🥑 Fat Content", f"{fat_grams} g")
 c4.metric("💧 Water", f"{water} L")
 
-st.info(f"👟 **Steps:** {lvl['s']:,} | 🏋️ **Workout:** {lvl['work']}")
+st.info(f"👟 **Steps:** {lvl['s']:,} | ⚖️ **BMI:** {bmi} ({status})")
+st.success(f"🏋️ **Suggested Exercise:** {lvl['ex']}")
 
-# 4. INSTANT LOCAL PLAN (The "Another Way")
 st.divider()
-st.subheader("📋 Your Personalized Plan")
 
-# This part shows up instantly without AI
-col_left, col_right = st.columns(2)
-with col_left:
-    st.write("### 🥗 Recommended Meals")
-    st.write(f"- **Breakfast:** High Protein {cuisine} bowl (~{int(cal*0.25)} kcal)")
-    st.write(f"- **Lunch:** Balanced {cuisine} platter with greens (~{int(cal*0.4)} kcal)")
-    st.write(f"- **Dinner:** Light {cuisine} protein-focused meal (~{int(cal*0.35)} kcal)")
-
-with col_right:
-    st.write("### 🏃 Exercise Details")
-    st.write(f"- **Intensity:** {intensity}")
-    st.write(f"- **Focus:** {lvl['work']}")
-    st.write(f"- **Target Steps:** {lvl['s']:,}")
-
-# 5. OPTIONAL AI UPGRADE
-st.divider()
-if st.button("✨ Enhance Plan with AI (Gemini)"):
-    try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"1-day {cuisine} menu for {w}kg {g}, BMI {bmi}, Intensity {intensity}. Goal {goal}. {cal}kcal, {prot}g protein."
-        with st.spinner("AI is thinking..."):
-            res = model.generate_content(prompt)
-            st.markdown(res.text)
-    except:
-        st.error("AI Busy. Using the local scientific plan above.")
+# 5. AI COACH (Workout + Diet)
+if st.button("🚀 Ask AI Coach for Detailed Plan"):
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.error("API Key missing!")
+    else:
+        with st.spinner("AI analyzing metrics..."):
+            try:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt = f"Diet & Workout Coach for {g}, {a}y, {w}kg. BMI {bmi}. Goal {goal}, {intensity} intensity. Provide {cuisine} menu for {cal}cal, {prot}g protein, {fat_grams}g fat. Suggest workout."
+                res = model.generate_content(prompt)
+                st.markdown(res.text)
+                st.balloons()
+            except:
+                st.error("AI Busy. Use the scientific targets displayed above!")
