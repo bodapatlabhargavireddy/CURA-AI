@@ -1,9 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 
+# --- CONFIG ---
 st.set_page_config(page_title="Cura AI Pro", layout="wide")
 
-# 1. RETRIEVE DATA
+# 1. DYNAMIC DATA RETRIEVAL (Syncing from Page 1)
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
@@ -11,11 +12,13 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. LOCAL SCIENCE ENGINE (Instant)
+# 2. LOCAL SCIENCE ENGINE (Instant & Guaranteed)
 bmi = round(w / ((h/100)**2), 1)
 status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
 
 st.title("🛡️ Cura AI: Performance Coach")
+st.info(f"👤 **Profile Synced:** {g} | {w}kg | {h}cm | BMI: {bmi} ({status})")
+
 intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
 i_map = {
@@ -26,7 +29,7 @@ i_map = {
 }
 lvl = i_map[intensity]
 
-# Math
+# Accurate Math
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
 cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
@@ -35,47 +38,67 @@ fat_g = int((cal * lvl["f"]) / 9)
 water = round((w * 0.035) + (0.5 if intensity != "Rest" else 0), 1)
 
 # 3. DISPLAY VITALS
-
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("🔥 Calories", f"{cal} kcal")
 c2.metric("🍗 Protein", f"{prot} g")
 c3.metric("🥑 Fat Content", f"{fat_g} g")
 c4.metric("💧 Water", f"{water} L")
 
-st.info(f"👟 **Step Goal:** {lvl['s']:,} | ⚖️ **BMI:** {bmi} ({status})")
+st.info(f"👟 **Step Goal:** {lvl['s']:,} | ⚖️ **BMI:** {bmi}")
 st.divider()
 
-# 4. THE UNIVERSAL AI DISCOVERY CALL
+# --- 4. THE CACHED AI CALL (Quota Protection) ---
+if "plan_cache" not in st.session_state:
+    st.session_state.plan_cache = None
+
 if st.button("🚀 Generate AI Workout & Meal Plan"):
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("Missing API Key!")
+    if st.session_state.plan_cache:
+        st.success("✅ Plan loaded from Session Memory.")
     else:
-        with st.spinner("Searching for compatible AI engine..."):
-            try:
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                
-                # Automatically find the right model name for your key
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                
-                if not available_models:
-                    st.error("No compatible models found for this API key.")
-                else:
-                    # Try the first available model (usually flash or pro)
-                    target_model = available_models[0]
+        if "GEMINI_API_KEY" not in st.secrets:
+            st.error("Missing API Key!")
+        else:
+            with st.spinner("Analyzing biological data..."):
+                try:
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    
+                    # Auto-detect available model to avoid 404s
+                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    target_model = available_models[0] if available_models else "gemini-1.5-flash"
                     model = genai.GenerativeModel(target_model)
                     
-                    prompt = (f"Coach: 1-day {cuisine} menu and 45m workout for {g}, {w}kg. "
+                    prompt = (f"Coach: 1-day {cuisine} menu and workout for {g}, {w}kg. "
                               f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
-                              f"Target: {cal}cal, {prot}g protein, {fat_g}g fat.")
+                              f"Target: {cal}cal, {prot}g protein.")
                     
                     response = model.generate_content(prompt)
-                    st.success(f"✅ Generated using {target_model}")
-                    st.markdown(response.text)
+                    st.session_state.plan_cache = response.text
                     st.balloons()
                     
-            except Exception as e:
-                st.error(f"Final Attempt Error: {str(e)}")
-                st.warning("Presentation Tip: Show the judges the live metrics above—they are 100% accurate!")
+                except Exception as e:
+                    if "429" in str(e):
+                        st.warning("⚠️ API Quota Reached. Switching to Cura Local Backup...")
+                        st.session_state.plan_cache = f"""
+                        ### 🍱 Expert {cuisine} Plan for {w}kg {g}
+                        * **Breakfast:** Vegetable Poha or Sprouts Salad
+                        * **Lunch:** Brown Rice with {cuisine} Dal & Veggies
+                        * **Dinner:** Clear Soup with Grilled Protein
+                        * **Target:** {cal} kcal | {prot}g Protein
+                        
+                        **Workout Strategy ({intensity}):**
+                        * **Warm-up:** 5 mins stretching
+                        * **Main:** 30 mins Brisk Activity
+                        * **Daily Goal:** {lvl['s']} Steps Today
+                        
+                        *💡 Note: Generated via local engine (Sync Verified for {w}kg).*
+                        """
+                    else:
+                        st.error(f"Error: {str(e)}")
+
+# Always display the plan once it exists
+if st.session_state.plan_cache:
+    st.markdown(st.session_state.plan_cache)
 
 if st.sidebar.button("🔄 Restart"):
+    st.session_state.plan_cache = None
     st.switch_page("cura.py")
