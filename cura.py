@@ -1,19 +1,18 @@
 import streamlit as st
 
-st.title("🛡️ Cura: User Profile")
+st.set_page_config(page_title="Cura AI", initial_sidebar_state="collapsed")
+st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
 
-# We check if weight exists, if not, set a default. This prevents the reset.
-if "weight" not in st.session_state:
-    st.session_state.weight = 70.0
-if "height" not in st.session_state:
-    st.session_state.height = 170.0
+st.title("🛡️ Cura AI: Step 1")
+st.subheader("Physical Profile")
 
-# By using key="weight", the value is saved globally automatically
-st.number_input("Enter Your Weight (kg)", 30.0, 200.0, key="weight")
-st.number_input("Enter Your Height (cm)", 100.0, 250.0, key="height")
-st.selectbox("Your Goal", ["Weight Loss", "Muscle Gain", "Maintenance"], key="goal")
+# Save directly to session_state using 'key'
+st.number_input("Age", 15, 95, 25, key="age")
+st.selectbox("Gender", ["Male", "Female"], key="gender")
+st.number_input("Weight (kg)", 35.0, 180.0, 70.0, key="weight")
+st.number_input("Height (cm)", 100.0, 250.0, 170.0, key="height")
 
-st.success(f"Current Memory: {st.session_state.weight}kg")
+st.progress(20) # Progress bar
 
-if st.button("Go to Monitor"):
-    st.switch_page("pages/3_Monitor.py")
+if st.button("Next: Health Profile ➡️"):
+    st.switch_page("pages/1_Health.py")
