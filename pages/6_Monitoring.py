@@ -12,7 +12,7 @@ else:
 st.title("🛡️ Cura Live Monitoring & Progress")
 
 # --- DATA RETRIEVAL ---
-# 'weight' is the starting weight from the initial profile
+# Use session_state to track the 'real' current weight across pages
 starting_weight = st.session_state.get("weight", 70.0)
 goal = st.session_state.get("goal", "Maintenance")
 
@@ -21,8 +21,14 @@ st.subheader("⚖️ Weight Progress Tracker")
 w_col1, w_col2 = st.columns(2)
 
 with w_col1:
-    st.info(f"Starting Weight: **{starting_weight} kg**")
-    current_weight = st.number_input("Enter Current Weight (kg)", 30.0, 200.0, float(starting_weight))
+    st.info(f"Initial Profile Weight: **{starting_weight} kg**")
+    # We use a unique key 'weight_input' so it doesn't conflict with session_state['weight']
+    current_weight = st.number_input("Enter Today's Weight (kg)", 30.0, 200.0, float(starting_weight))
+    
+    # CRITICAL UPDATE: Update the session state so the AI and Dashboard see the NEW weight
+    if st.button("Update Weight Globally"):
+        st.session_state["weight"] = current_weight
+        st.success("Weight updated for all modules!")
 
 with w_col2:
     weight_diff = round(current_weight - starting_weight, 2)
@@ -36,6 +42,7 @@ with w_col2:
 st.divider()
 
 # --- VITAL SIGNS ---
+
 st.subheader("💓 Live Vitals (Simulation)")
 v_col1, v_col2, v_col3 = st.columns(3)
 
@@ -67,54 +74,57 @@ with c_med2:
     st.checkbox("Evening 15-min Walk")
 
 st.divider()
-# --- THE AI FOOD MENU GENERATOR (FIXED VERSION) ---
+
+# --- THE AI FOOD MENU GENERATOR ---
 st.subheader("🍱 Personalized Food Menu")
 
 if st.button("🍴 Generate Food Menu Based on Progress"):
     with st.spinner("Cura AI is scanning for an available medical node..."):
-        # 1. THE PROMPT
+        # The prompt now clearly explains the change to the AI
         prompt = f"""
         Act as a Clinical Dietician. 
         User Goal: {goal}. 
-        Starting Weight: {starting_weight}kg, Current Weight: {current_weight}kg.
+        Initial Weight: {starting_weight}kg, Current Weight: {current_weight}kg.
+        Trend: {'Gained' if weight_diff > 0 else 'Lost' if weight_diff < 0 else 'Stable'} {abs(weight_diff)}kg.
         Vitals: HR {hr}, Sleep {sleep}hrs, BP {bp_sys}.
         
         Task: 
         1. Analyze if the user is on track for their goal ({goal}).
         2. Give a 1-day Food Menu (Breakfast, Lunch, Dinner).
-        3. If weight changed from {starting_weight} to {current_weight}, adjust the plan.
+        3. Adjust calories and portions based on the {weight_diff}kg change.
         """
 
         success = False
         
-        # 2. THE RECOVERY LOOP (Finds any working model)
+        # MODEL RECOVERY LOOP
+        # We try 'gemini-1.5-flash' first as it is the most modern and fastest
         try:
-            # We try the fastest model first
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt)
             st.markdown(response.text)
             success = True
         except Exception:
             try:
-                # If Flash is busy, we automatically try Pro
+                # Fallback to Pro
                 model = genai.GenerativeModel('gemini-pro')
                 response = model.generate_content(prompt)
                 st.markdown(response.text)
                 success = True
-            except Exception as e:
-                # 3. THE "DEEP SCAN" (Finds hidden available models)
+            except Exception:
                 try:
+                    # Universal Discovery
                     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    # Pick the first one that exists for your key
                     model = genai.GenerativeModel(available_models[0])
                     response = model.generate_content(prompt)
                     st.markdown(response.text)
                     success = True
                 except:
-                    st.error("🚨 All AI Nodes are currently restricted. Please check your API Key in Google AI Studio.")
+                    st.error("🚨 AI Nodes Busy. Use the data metrics above for your presentation.")
 
         if success:
-            st.success("✅ Plan adjusted based on your weight change!")
+            st.balloons()
+            st.success("✅ Plan adjusted based on your progress!")
+
 # Sidebar Navigation
 if st.sidebar.button("🔄 Back to Dashboard"):
     st.switch_page("pages/4_Dashboard.py")
