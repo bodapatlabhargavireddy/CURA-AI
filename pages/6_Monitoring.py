@@ -12,32 +12,39 @@ else:
 st.title("🛡️ Cura Live Monitoring & Progress")
 
 # --- DATA RETRIEVAL ---
-# Use session_state to track the 'real' current weight across pages
-starting_weight = st.session_state.get("weight", 70.0)
+# We use .get() to find the height from the first page for BMI math
+height_cm = st.session_state.get("height", 170.0) 
 goal = st.session_state.get("goal", "Maintenance")
 
-# --- NEW FEATURE: WEIGHT TRACKING ---
-st.subheader("⚖️ Weight Progress Tracker")
-w_col1, w_col2 = st.columns(2)
+# --- WEIGHT TRACKING (AUTO-SYNCED) ---
+st.subheader("⚖️ Weight & BMI Progress")
+w_col1, w_col2, w_col3 = st.columns(3)
 
 with w_col1:
-    st.info(f"Initial Profile Weight: **{starting_weight} kg**")
-    # We use a unique key 'weight_input' so it doesn't conflict with session_state['weight']
-    current_weight = st.number_input("Enter Today's Weight (kg)", 30.0, 200.0, float(starting_weight))
-    
-    # CRITICAL UPDATE: Update the session state so the AI and Dashboard see the NEW weight
-    if st.button("Update Weight Globally"):
-        st.session_state["weight"] = current_weight
-        st.success("Weight updated for all modules!")
+    # IMPORTANT: By using key="weight", this input stays the same on every page.
+    # No more resetting when you switch pages!
+    current_weight = st.number_input("Enter Today's Weight (kg)", 30.0, 200.0, key="weight")
 
 with w_col2:
-    weight_diff = round(current_weight - starting_weight, 2)
-    if weight_diff > 0:
-        st.warning(f"Weight Gain: +{weight_diff} kg")
-    elif weight_diff < 0:
-        st.success(f"Weight Loss: {weight_diff} kg")
-    else:
-        st.info("Weight is Stable")
+    # LIVE BMI MATH: Updates automatically as you type
+    bmi = round(current_weight / ((height_cm / 100) ** 2), 1)
+    
+    if bmi < 18.5: status, color = "Underweight", "blue"
+    elif 18.5 <= bmi < 25: status, color = "Healthy", "green"
+    elif 25 <= bmi < 30: status, color = "Overweight", "orange"
+    else: status, color = "Obese", "red"
+    
+    st.metric("Live BMI", f"{bmi}", delta=status)
+    st.markdown(f"Status: :{color}[**{status}**]")
+
+with w_col3:
+    # This assumes 'starting_weight' was the very first value entered
+    # We store the very first weight in a separate 'initial' key if you want to track total loss
+    if "initial_weight" not in st.session_state:
+        st.session_state["initial_weight"] = current_weight
+        
+    diff = round(current_weight - st.session_state["initial_weight"], 2)
+    st.metric("Total Change", f"{diff} kg", delta=diff, delta_color="inverse")
 
 st.divider()
 
@@ -79,25 +86,19 @@ st.divider()
 st.subheader("🍱 Personalized Food Menu")
 
 if st.button("🍴 Generate Food Menu Based on Progress"):
-    with st.spinner("Cura AI is scanning for an available medical node..."):
-        # The prompt now clearly explains the change to the AI
+    with st.spinner("Cura AI is analyzing your live data..."):
         prompt = f"""
         Act as a Clinical Dietician. 
         User Goal: {goal}. 
-        Initial Weight: {starting_weight}kg, Current Weight: {current_weight}kg.
-        Trend: {'Gained' if weight_diff > 0 else 'Lost' if weight_diff < 0 else 'Stable'} {abs(weight_diff)}kg.
+        Current Weight: {current_weight}kg, BMI: {bmi} ({status}).
         Vitals: HR {hr}, Sleep {sleep}hrs, BP {bp_sys}.
         
         Task: 
-        1. Analyze if the user is on track for their goal ({goal}).
-        2. Give a 1-day Food Menu (Breakfast, Lunch, Dinner).
-        3. Adjust calories and portions based on the {weight_diff}kg change.
+        1. Give a 1-day Food Menu (Breakfast, Lunch, Dinner) based on BMI status: {status}.
+        2. Provide 2 health tips for a {goal} goal.
         """
 
         success = False
-        
-        # MODEL RECOVERY LOOP
-        # We try 'gemini-1.5-flash' first as it is the most modern and fastest
         try:
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt)
@@ -105,25 +106,16 @@ if st.button("🍴 Generate Food Menu Based on Progress"):
             success = True
         except Exception:
             try:
-                # Fallback to Pro
-                model = genai.GenerativeModel('gemini-pro')
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                model = genai.GenerativeModel(available_models[0])
                 response = model.generate_content(prompt)
                 st.markdown(response.text)
                 success = True
-            except Exception:
-                try:
-                    # Universal Discovery
-                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    model = genai.GenerativeModel(available_models[0])
-                    response = model.generate_content(prompt)
-                    st.markdown(response.text)
-                    success = True
-                except:
-                    st.error("🚨 AI Nodes Busy. Use the data metrics above for your presentation.")
+            except:
+                st.error("🚨 AI Nodes Busy. Your live BMI is still calculated above!")
 
         if success:
             st.balloons()
-            st.success("✅ Plan adjusted based on your progress!")
 
 # Sidebar Navigation
 if st.sidebar.button("🔄 Back to Dashboard"):
