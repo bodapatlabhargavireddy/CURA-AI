@@ -3,7 +3,7 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="Cura AI Pro", layout="wide")
 
-# 1. DATA RECOVERY
+# 1. RETRIEVE DATA
 w = st.session_state.get("weight", 70.0)
 h = st.session_state.get("height", 170.0)
 a = st.session_state.get("age", 25)
@@ -11,68 +11,72 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. INSTANT SCIENCE ENGINE
+# 2. LOCAL CALCULATION (For AI Context)
 bmi = round(w / ((h/100)**2), 1)
-status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
-
-st.title("🛡️ Cura AI: Performance Coach")
-intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
-
-# Logic Mapping
-i_map = {
-    "Rest": {"m": 1.2, "w": 0.0, "p": 1.2, "f": 0.30, "s": 4000},
-    "Light": {"m": 1.375, "w": 0.5, "p": 1.4, "f": 0.25, "s": 7000},
-    "Moderate": {"m": 1.55, "w": 1.0, "p": 1.8, "f": 0.25, "s": 10000},
-    "Heavy": {"m": 1.725, "w": 1.5, "p": 2.2, "f": 0.20, "s": 15000}
-}
-lvl = i_map[intensity]
-
-# Calculations
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
-cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
-prot = int(w * lvl["p"])
-fat_g = int((cal * lvl["f"]) / 9)
-water = round((w * 0.035) + lvl["w"], 1)
 
-# 3. DISPLAY DASHBOARD
+st.title("🛡️ Cura AI: Total Coach")
+intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
+# Intensity Logic for the AI
+i_map = {
+    "Rest": 1.2, "Light": 1.375, "Moderate": 1.55, "Heavy": 1.725
+}
+cal = int(bmr * i_map[intensity])
+prot = int(w * 1.8)
+fat = int((cal * 0.25) / 9)
+
+# 3. METRICS DISPLAY
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("🔥 Calories", f"{cal} kcal")
-c2.metric("🍗 Protein", f"{prot} g")
-c3.metric("🥑 Fat Content", f"{fat_g} g")
-c4.metric("💧 Water", f"{water} L")
+c1.metric("⚖️ BMI", f"{bmi}")
+c2.metric("🔥 Calories", f"{cal}")
+c3.metric("🍗 Protein", f"{prot}g")
+c4.metric("🥑 Fat", f"{fat}g")
 
-st.info(f"👟 **Steps:** {lvl['s']:,} | ⚖️ **BMI:** {bmi} ({status})")
-
-# 4. THE "CLEAN CALL" AI MODEL
 st.divider()
-if st.button("🚀 Generate AI Coaching Plan"):
+
+# 4. THE AI ENGINE (Meal & Exercise Plan)
+if st.button("🚀 Generate My AI Meal & Exercise Plan"):
     if "GEMINI_API_KEY" not in st.secrets:
         st.error("Missing API Key!")
     else:
-        with st.spinner("AI is thinking..."):
+        with st.spinner("AI Coach is drafting your plan..."):
             try:
-                # Direct Configuration (No extra parameters to slow it down)
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                # Simplified Prompt - Shortest possible length for fastest response
-                msg = f"Give a 45m workout and {cuisine} menu for {cal}cal, {prot}g protein, {fat_g}g fat. Goal: {goal}."
+                # STRICT PROMPT: Forces AI to give exactly what you asked for
+                prompt = (
+                    f"You are a professional fitness coach. Based on these metrics:\n"
+                    f"- Profile: {g}, {a} years old, {w}kg\n"
+                    f"- BMI: {bmi}\n"
+                    f"- Goal: {goal}\n"
+                    f"- Today's Intensity: {intensity}\n"
+                    f"- Targets: {cal} kcal, {prot}g Protein, {fat}g Fat\n\n"
+                    f"Provide:\n"
+                    f"1. A specific 45-minute EXERCISE PLAN for this intensity.\n"
+                    f"2. A 1-day {cuisine} MEAL PLAN (Breakfast, Lunch, Dinner) fitting the macros.\n"
+                    f"Keep it professional and formatted with bullet points."
+                )
                 
-                response = model.generate_content(msg)
+                # Use a specific configuration to speed up response
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        max_output_tokens=800
+                    )
+                )
                 
                 if response.text:
-                    st.success("✅ AI Plan Ready")
                     st.markdown(response.text)
                     st.balloons()
+                else:
+                    st.error("AI generated an empty response. Click again.")
+                    
             except Exception as e:
-                # If the AI is literally down, this gives a professional fallback
-                st.error("⚠️ AI Cloud is busy. Showing Local Science Plan...")
-                st.write(f"### 📋 Instant Plan for {intensity} Day")
-                st.write(f"- **Focus:** Increase protein to {prot}g to support muscle.")
-                st.write(f"- **Hydration:** Drink {water}L to maintain metabolic rate.")
-                st.write(f"- **Exercise:** Focus on hitting {lvl['s']:,} steps today.")
+                st.error("AI is temporarily unavailable due to high traffic. Please try once more in 5 seconds.")
 
 if st.sidebar.button("🔄 Restart"):
     st.switch_page("cura.py")
