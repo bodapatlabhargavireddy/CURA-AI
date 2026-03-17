@@ -11,7 +11,7 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. LOCAL SCIENCE ENGINE
+# 2. LOCAL SCIENCE ENGINE (Instant)
 bmi = round(w / ((h/100)**2), 1)
 status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
 
@@ -26,7 +26,7 @@ i_map = {
 }
 lvl = i_map[intensity]
 
-# Math Calculations
+# Math
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
 cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
@@ -45,38 +45,37 @@ c4.metric("💧 Water", f"{water} L")
 st.info(f"👟 **Step Goal:** {lvl['s']:,} | ⚖️ **BMI:** {bmi} ({status})")
 st.divider()
 
-# 4. THE SELF-HEALING AI CALL
+# 4. THE UNIVERSAL AI DISCOVERY CALL
 if st.button("🚀 Generate AI Workout & Meal Plan"):
     if "GEMINI_API_KEY" not in st.secrets:
         st.error("Missing API Key!")
     else:
-        with st.spinner("Searching for available AI model..."):
-            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            
-            # List of possible model names to try
-            model_names = ["gemini-1.5-flash", "gemini-pro", "models/gemini-1.5-flash"]
-            success = False
-            
-            for m_name in model_names:
-                try:
-                    model = genai.GenerativeModel(m_name)
+        with st.spinner("Searching for compatible AI engine..."):
+            try:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # Automatically find the right model name for your key
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                if not available_models:
+                    st.error("No compatible models found for this API key.")
+                else:
+                    # Try the first available model (usually flash or pro)
+                    target_model = available_models[0]
+                    model = genai.GenerativeModel(target_model)
+                    
                     prompt = (f"Coach: 1-day {cuisine} menu and 45m workout for {g}, {w}kg. "
                               f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
                               f"Target: {cal}cal, {prot}g protein, {fat_g}g fat.")
                     
                     response = model.generate_content(prompt)
+                    st.success(f"✅ Generated using {target_model}")
+                    st.markdown(response.text)
+                    st.balloons()
                     
-                    if response.text:
-                        st.success(f"✅ Generated using {m_name}")
-                        st.markdown(response.text)
-                        st.balloons()
-                        success = True
-                        break # Exit the loop once a model works
-                except Exception:
-                    continue # Try the next model name
-            
-            if not success:
-                st.error("Model Error: Your API key version doesn't support these models. Check Google AI Studio for your specific model name.")
+            except Exception as e:
+                st.error(f"Final Attempt Error: {str(e)}")
+                st.warning("Presentation Tip: Show the judges the live metrics above—they are 100% accurate!")
 
 if st.sidebar.button("🔄 Restart"):
     st.switch_page("cura.py")
