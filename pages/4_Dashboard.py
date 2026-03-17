@@ -11,72 +11,60 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. LOCAL CALCULATION (For AI Context)
+# 2. INSTANT SCIENCE ENGINE
 bmi = round(w / ((h/100)**2), 1)
+status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
+
+# Intensity Logic
+intensity = st.select_slider("Activity Level Today:", options=["Rest", "Light", "Moderate", "Heavy"])
+i_map = {"Rest": 1.2, "Light": 1.375, "Moderate": 1.55, "Heavy": 1.725}
+
+# Basic Math
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
-
-st.title("🛡️ Cura AI: Total Coach")
-intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
-
-# Intensity Logic for the AI
-i_map = {
-    "Rest": 1.2, "Light": 1.375, "Moderate": 1.55, "Heavy": 1.725
-}
-cal = int(bmr * i_map[intensity])
+cal = int(bmr * i_map[intensity]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
 prot = int(w * 1.8)
 fat = int((cal * 0.25) / 9)
+water = round(w * 0.035, 1)
 
-# 3. METRICS DISPLAY
+# 3. DISPLAY VITALS
+st.title("🛡️ Cura AI Dashboard")
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("⚖️ BMI", f"{bmi}")
-c2.metric("🔥 Calories", f"{cal}")
-c3.metric("🍗 Protein", f"{prot}g")
-c4.metric("🥑 Fat", f"{fat}g")
+c1.metric("🔥 Calories", f"{cal}")
+c2.metric("🍗 Protein", f"{prot}g")
+c3.metric("🥑 Fat", f"{fat}g")
+c4.metric("💧 Water", f"{water}L")
 
+st.info(f"📊 **BMI:** {bmi} ({status}) | **Goal:** {goal}")
 st.divider()
 
-# 4. THE AI ENGINE (Meal & Exercise Plan)
-if st.button("🚀 Generate My AI Meal & Exercise Plan"):
+# 4. THE AI PLANNER (Meal & Exercise)
+if st.button("🚀 Generate AI Meal & Exercise Plan"):
     if "GEMINI_API_KEY" not in st.secrets:
         st.error("Missing API Key!")
     else:
-        with st.spinner("AI Coach is drafting your plan..."):
+        with st.spinner("AI is crafting your plan..."):
             try:
+                # Setup AI
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                # STRICT PROMPT: Forces AI to give exactly what you asked for
-                prompt = (
-                    f"You are a professional fitness coach. Based on these metrics:\n"
-                    f"- Profile: {g}, {a} years old, {w}kg\n"
-                    f"- BMI: {bmi}\n"
-                    f"- Goal: {goal}\n"
-                    f"- Today's Intensity: {intensity}\n"
-                    f"- Targets: {cal} kcal, {prot}g Protein, {fat}g Fat\n\n"
-                    f"Provide:\n"
-                    f"1. A specific 45-minute EXERCISE PLAN for this intensity.\n"
-                    f"2. A 1-day {cuisine} MEAL PLAN (Breakfast, Lunch, Dinner) fitting the macros.\n"
-                    f"Keep it professional and formatted with bullet points."
-                )
+                # SHORT PROMPT = FAST RESPONSE
+                prompt = (f"As a fitness coach, provide a 1-day {cuisine} meal plan "
+                         f"and a workout for a {w}kg {g} with BMI {bmi}. "
+                         f"Goal: {goal}, Intensity: {intensity}. "
+                         f"Target: {cal}kcal, {prot}g Protein, {fat}g Fat.")
                 
-                # Use a specific configuration to speed up response
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=800
-                    )
-                )
+                # Optimized for maximum speed
+                response = model.generate_content(prompt)
                 
                 if response.text:
                     st.markdown(response.text)
                     st.balloons()
                 else:
-                    st.error("AI generated an empty response. Click again.")
-                    
-            except Exception as e:
-                st.error("AI is temporarily unavailable due to high traffic. Please try once more in 5 seconds.")
+                    st.warning("AI Busy. Wait 5 seconds and click again.")
+            except Exception:
+                st.error("API Limit reached. Wait 10 seconds and try one last time.")
 
 if st.sidebar.button("🔄 Restart"):
     st.switch_page("cura.py")
