@@ -11,7 +11,7 @@ g = st.session_state.get("gender", "Male")
 goal = st.session_state.get("goal", "Weight Loss")
 cuisine = st.session_state.get("cuisine", "Indian")
 
-# 2. LOCAL SCIENCE ENGINE (Always Works)
+# 2. LOCAL SCIENCE ENGINE
 bmi = round(w / ((h/100)**2), 1)
 status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
 
@@ -34,7 +34,6 @@ fat_g = int((cal * lvl["f"]) / 9)
 water = round((w * 0.035) + (0.5 if intensity != "Rest" else 0), 1)
 
 # 3. DISPLAY VITALS
-
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("🔥 Calories", f"{cal} kcal")
 c2.metric("🍗 Protein", f"{prot} g")
@@ -44,42 +43,34 @@ c4.metric("💧 Water", f"{water} L")
 st.info(f"👟 **Step Goal:** {lvl['s']:,} | ⚖️ **BMI:** {bmi} ({status})")
 st.divider()
 
-# 4. THE "UNBREAKABLE" AI CALL
+# 4. AI CALL
 if st.button("🚀 Generate AI Workout & Meal Plan"):
     if "GEMINI_API_KEY" not in st.secrets:
-        st.error("Missing API Key!")
+        st.error("Missing API Key! Please add GEMINI_API_KEY in Streamlit secrets.")
     else:
         with st.spinner("AI is connecting to servers..."):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                
-                # Using the '8b' model which is the fastest and least likely to be busy
-                model = genai.GenerativeModel('gemini-1.5-flash-8b')
-                
-                # Ultra-short prompt to ensure speed and bypass filters
-                prompt = (f"Provide a 1-day {cuisine} meal menu and a 45min workout "
-                          f"for {w}kg {g}, BMI {bmi}, Intensity {intensity}, Goal {goal}. "
-                          f"Strict targets: {cal}cal, {prot}g protein, {fat_g}g fat.")
-                
-                # Disabling safety filters that cause "Busy" errors
-                response = model.generate_content(
-                    prompt,
-                    safety_settings=[
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                    ]
+                model = genai.GenerativeModel("gemini-1.5-flash")
+
+                prompt = (
+                    f"Provide a 1-day {cuisine} meal menu and a 45min workout "
+                    f"for {w}kg {g}, BMI {bmi}, Intensity {intensity}, Goal {goal}. "
+                    f"Strict targets: {cal}cal, {prot}g protein, {fat_g}g fat."
                 )
-                
-                if response.text:
+
+                response = model.generate_content(prompt)
+
+                if response and response.text:
                     st.success("✅ AI Coaching Plan Generated")
                     st.markdown(response.text)
                     st.balloons()
-                
+                else:
+                    st.warning("AI did not return a valid response. Try again.")
+
             except Exception as e:
-                st.error("AI Server Busy. This is a Google Cloud limitation.")
-                st.warning("Presentation Tip: Point to the Protein and Fat metrics above—they are calculated locally and are 100% accurate!")
+                st.error(f"AI Server Error: {e}")
+                st.warning("Tip: The nutrition and fitness metrics above are calculated locally and always accurate!")
 
 if st.sidebar.button("🔄 Restart"):
     st.switch_page("cura.py")
