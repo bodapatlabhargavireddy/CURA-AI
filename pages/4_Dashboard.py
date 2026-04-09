@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai  # Optimized for the new Google library
 
 # --- 1. DATA RECOVERY ---
 w = st.session_state.get("user_weight")
@@ -57,27 +57,16 @@ st.metric("Required Steps Today", f"{step_goal:,} steps", delta=f"{intensity} Le
 
 st.divider()
 
-# --- 4. THE AI GENERATOR ---
+# --- 4. THE AI GENERATOR (UPDATED ENGINE) ---
 if "final_ai_plan" not in st.session_state:
     st.session_state.final_ai_plan = None
 
 if st.button("🚀 Generate Personalized AI Plan"):
-    with st.spinner("Connecting to Gemini AI Engine..."):
+    with st.spinner("Connecting to High-Speed Gemini Engine..."):
         try:
-            # OPTIMIZED CONFIGURATION
-            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+            # New Client Initialization
+            client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
             
-            # Using specific parameters to avoid timeouts
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                generation_config={
-                    "temperature": 0.7,
-                    "top_p": 0.95,
-                    "max_output_tokens": 1024,
-                }
-            )
-            
-            # THE FORCE PROMPT
             prompt = (
                 f"Role: Clinical Nutritionist. Profile: {g}, {w}kg, {a}yo. "
                 f"Goal: {goal}. Intensity: {intensity}. Diet: {diet_type} ({cuisine}). "
@@ -86,13 +75,20 @@ if st.button("🚀 Generate Personalized AI Plan"):
                 f"MANDATORY: Plan a workout for {step_goal} steps. Use bold headers."
             )
             
-            response = model.generate_content(prompt)
+            # Using the new contents-based generation
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt
+            )
+            
             st.session_state.final_ai_plan = response.text
             st.balloons()
             st.success("✅ AI Plan Generated successfully.")
             
         except Exception as e:
-            st.error("🚨 API Busy. Please wait exactly 30 seconds (Free Tier Limit).")
+            # If it fails, we show the real error for debugging
+            st.error(f"🚨 Connection Refused. Please REBOOT the app in Streamlit Dashboard.")
+            st.info("Ensure you have updated requirements.txt to include google-genai")
 
 # --- 5. DISPLAY AI PLAN ---
 if st.session_state.final_ai_plan:
