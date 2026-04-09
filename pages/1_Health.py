@@ -30,4 +30,4 @@ if st.button("Next: Set Your Goal 🎯"):
     # Force sync medical data
     st.session_state["final_conditions"] = st.session_state.health_conditions
     st.session_state["final_allergies"] = st.session_state.allergies
-    st.switch_page("pages/2_Goal.py")
+    st.switch_page("pages/2_Goals.py")
