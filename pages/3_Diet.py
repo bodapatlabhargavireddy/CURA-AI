@@ -8,14 +8,14 @@ if "user_goal" not in st.session_state:
     st.switch_page("pages/2_Goal.py")
     st.stop()
 
-st.title("🥗 Diet & Nutrition Preferences")
-st.write("Customize your meal plan logic.")
+st.title("🥗 Diet & Nutrition")
+st.write(f"Tailoring nutrition for: **{st.session_state.user_goal}**")
 
 col1, col2 = st.columns(2)
 
 with col1:
     st.selectbox(
-        "Dietary Type:",
+        "Dietary Preference:",
         options=["Vegetarian", "Non-Vegetarian", "Vegan", "Eggetarian"],
         key="diet_type_val"
     )
@@ -28,18 +28,17 @@ with col2:
     )
 
 st.multiselect(
-    "Any specific dislikes? (AI will avoid these):",
-    options=["Mushroom", "Dairy", "Spicy Food", "Sea Food", "Sweets"],
+    "Specific food dislikes or restrictions:",
+    options=["Spicy Food", "Dairy", "Gluten", "Sugar", "Mushrooms", "Sea Food"],
     key="dislikes_val"
 )
 
 st.divider()
 
-if st.button("Finalize & View Dashboard 📊"):
+if st.button("Generate Performance Dashboard 📊"):
     # Final data lock
     st.session_state["user_diet"] = st.session_state.diet_type_val
     st.session_state["user_cuisine"] = st.session_state.cuisine_val
     st.session_state["user_dislikes"] = st.session_state.dislikes_val
     
-    # NOW we go to the Dashboard
     st.switch_page("pages/4_Dashboard.py")
