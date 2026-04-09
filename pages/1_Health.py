@@ -1,13 +1,11 @@
 import streamlit as st
 
-st.set_page_config(initial_sidebar_state="collapsed")
-st.title("🏥 Step 1: Medical Context")
+st.title("🩺 Health Metrics")
 
-st.multiselect("Select any active conditions:", 
-               ["None", "Diabetes", "BP Control", "Thyroid", "PCOD/PCOS"], 
-               key="meds")
+# Using 'key' automatically saves this to st.session_state
+st.number_input("Enter Weight (kg):", min_value=30.0, max_value=200.0, value=st.session_state.get("weight", 70.0), key="weight")
+st.number_input("Enter Height (cm):", min_value=100, max_value=250, value=st.session_state.get("height", 170.0), key="height")
+st.selectbox("Gender:", ["Male", "Female", "Other"], key="gender")
 
-st.progress(25)
-
-if st.button("Next: Set Your Goal 🎯"):
-    st.switch_page("pages/2_Goals.py") # Ensure filename matches exactly
+if st.button("Save & Next"):
+    st.switch_page("pages/2_Goals.py")
