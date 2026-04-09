@@ -19,7 +19,6 @@ with col2:
     st.selectbox("Sex:", ["Male", "Female", "Other"], key="gender")
 
 st.divider()
-
 if st.button("Start Assessment 🏥"):
-    # This button just moves the user; the data is already saved by the 'keys' above
-    st.switch_page("pages/1_🏥_Health.py")
+    # Use the EXACT filename without the 'pages/' prefix 
+    st.switch_page("pages/1_Health.py")
