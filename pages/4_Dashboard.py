@@ -1,81 +1,70 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. DATA RECOVERY (The "Sync" Layer) ---
-# Pulling every detail from the previous 3 pages
-w = st.session_state.get("user_weight", 70.0)
-h = st.session_state.get("user_height", 170.0)
-a = st.session_state.get("user_age", 25)
-g = st.session_state.get("user_gender", "Male")
-goal = st.session_state.get("user_goal", "Maintenance")
-hc = st.session_state.get("final_conditions", ["None"])
-diet = st.session_state.get("user_diet", "Vegetarian")
-cuisine = st.session_state.get("user_cuisine", "Indian")
-dislikes = st.session_state.get("user_dislikes", ["None"])
+# --- 1. STRICT DATA RECOVERY ---
+# We use None as default. If it's None, we know they skipped a step.
+w = st.session_state.get("user_weight")
+h = st.session_state.get("user_height")
+a = st.session_state.get("user_age")
+g = st.session_state.get("user_gender")
+goal = st.session_state.get("user_goal")
 
-# --- 2. IMPROVED WATER CALCULATION ---
-# Base: 35ml per kg + 500ml for light/mod activity + 1000ml for heavy
+if any(v is None for v in [w, h, a, g, goal]):
+    st.error("⚠️ Incomplete Profile. Please restart the assessment.")
+    st.button("Restart", on_click=lambda: st.switch_page("cura.py"))
+    st.stop()
+
+# --- 2. DYNAMIC CALCULATIONS ---
+# Protein: Multipliers based on strict activity
 intensity = st.select_slider("Select Today's Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
-water_boost = {"Rest": 0.0, "Light": 0.5, "Moderate": 0.8, "Heavy": 1.2}
-# Higher base for those recovering from health issues
-base_multiplier = 0.040 if goal == "Recover from health issues" else 0.035
-water = round((w * base_multiplier) + water_boost[intensity], 1)
+prot_map = {"Rest": 1.2, "Light": 1.5, "Moderate": 1.8, "Heavy": 2.2}
+protein_target = round(w * prot_map[intensity], 1)
 
-# --- 3. BIOLOGICAL MATH ---
-bmi = round(w / ((h/100)**2), 1)
+# Steps
+steps = {"Rest": 4000, "Light": 7000, "Moderate": 10000, "Heavy": 15000}[intensity]
+
+# Water (4% of body weight + activity boost)
+water = round((w * 0.04) + {"Rest": 0, "Light": 0.5, "Moderate": 0.8, "Heavy": 1.2}[intensity], 1)
+
+# Calories
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
+cal = int(bmr * {"Rest": 1.2, "Light": 1.375, "Moderate": 1.55, "Heavy": 1.725}[intensity])
 
-# Intensity Multipliers
-i_map = {"Rest": 1.2, "Light": 1.375, "Moderate": 1.55, "Heavy": 1.725}
-cal = int(bmr * i_map[intensity])
-
-# Goal Adjustments
+# Goal Offset
 if "Loss" in goal: cal -= 500
 elif "Gain" in goal or "Muscle" in goal: cal += 400
 
+# --- 3. DYNAMIC UI ---
 st.title("🛡️ Cura AI: Performance Coach")
-st.info(f"👤 **Live Profile:** {g} | {w}kg | Goal: {goal}")
+# Heading is now 100% based on the user's specific choice
+st.subheader(f"Strategy: {goal}")
 
-# Metrics Display
+st.info(f"📊 **System Status:** Analyzing {w}kg {g} | {a} years old")
+
 c1, c2, c3 = st.columns(3)
-c1.metric("🔥 Target Calories", f"{cal} kcal")
-c2.metric("💧 Daily Water", f"{water} L", delta="Hydration Target")
-c3.metric("⚖️ BMI Status", f"{bmi}")
+c1.metric("🔥 Calories", f"{cal} kcal")
+c2.metric("🍗 Protein", f"{protein_target} g")
+c3.metric("💧 Water", f"{water} L")
+
+st.write("### 👟 Activity Target")
+st.metric("Daily Steps", f"{steps:,} steps")
 
 st.divider()
 
-# --- 4. THE SMART AI PROMPT ---
-if "final_plan" not in st.session_state:
-    st.session_state.final_plan = None
-
-if st.button("🚀 Generate Personalized Plan"):
-    with st.spinner("AI is analyzing Bio + Medical + Diet data..."):
-        try:
-            # DYNAMIC PROMPT: Now uses EVERYTHING the user entered
-            prompt = (
-                f"As a pro coach, create a 1-day plan for a {g}, {w}kg, {a}yo. "
-                f"Goal: {goal}. Medical Conditions: {hc}. "
-                f"Diet: {diet} ({cuisine} style). Avoid these: {dislikes}. "
-                f"Workout Intensity: {intensity}. "
-                f"Strictly include: 1. Meal plan totaling {cal} cal. 2. Specific advice for {hc}."
-            )
-            
-            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            response = model.generate_content(prompt)
-            st.session_state.final_plan = response.text
-            st.balloons()
-            
-        except Exception as e:
-            st.error("AI is currently offline. Showing local calculation.")
-            st.session_state.final_plan = f"Plan for {w}kg {g} seeking {goal} with {diet} diet."
-
-# Display the result
-if st.session_state.final_plan:
-    st.markdown(st.session_state.final_plan)
-
-if st.sidebar.button("🔄 Reset System"):
-    st.session_state.clear()
-    st.switch_page("cura.py")
+# --- 4. AI PROMPT  ---
+if st.button("🚀 Generate AI Analysis"):
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        prompt = (f"User: {g}, {w}kg, {a}yo. Goal: {goal}. Intensity: {intensity}. "
+                  f"Provide 1-day meal plan for {cal}cal and {protein_target}g protein. "
+                  f"Include a workout hitting {steps} steps.")
+        
+        response = model.generate_content(prompt)
+        st.markdown(response.text)
+    except:
+        st.warning("Switching to Local Engine due to API limit.")
+        st.write(f"Target {cal} kcal and {protein_target}g protein today.")
