@@ -1,117 +1,81 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. PAGE CONFIG & SYNC ---
-st.set_page_config(page_title="Cura AI Pro", layout="wide")
+# --- 1. DATA RECOVERY (The "Sync" Layer) ---
+# Pulling every detail from the previous 3 pages
+w = st.session_state.get("user_weight", 70.0)
+h = st.session_state.get("user_height", 170.0)
+a = st.session_state.get("user_age", 25)
+g = st.session_state.get("user_gender", "Male")
+goal = st.session_state.get("user_goal", "Maintenance")
+hc = st.session_state.get("final_conditions", ["None"])
+diet = st.session_state.get("user_diet", "Vegetarian")
+cuisine = st.session_state.get("user_cuisine", "Indian")
+dislikes = st.session_state.get("user_dislikes", ["None"])
 
-# Retrieving session data from Page 1 (cura.py)
-# Note: Defaults are provided but will be overridden by your 60kg input
-w = st.session_state.get("weight", 60.0)
-h = st.session_state.get("height", 170.0)
-a = st.session_state.get("age", 25)
-g = st.session_state.get("gender", "Female")
-goal = st.session_state.get("goal", "Weight Loss")
-cuisine = st.session_state.get("cuisine", "Indian")
+# --- 2. IMPROVED WATER CALCULATION ---
+# Base: 35ml per kg + 500ml for light/mod activity + 1000ml for heavy
+intensity = st.select_slider("Select Today's Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
 
-# --- 2. LOCAL SCIENCE ENGINE (Deterministic Math) ---
+water_boost = {"Rest": 0.0, "Light": 0.5, "Moderate": 0.8, "Heavy": 1.2}
+# Higher base for those recovering from health issues
+base_multiplier = 0.040 if goal == "Recover from health issues" else 0.035
+water = round((w * base_multiplier) + water_boost[intensity], 1)
+
+# --- 3. BIOLOGICAL MATH ---
 bmi = round(w / ((h/100)**2), 1)
-status = "Healthy" if 18.5 <= bmi < 25 else "Overweight" if 25 <= bmi < 30 else "Obese" if bmi >= 30 else "Underweight"
-
-st.title("🛡️ Cura AI: Performance Coach")
-st.info(f"👤 **Profile Synced:** {g} | {w}kg | {h}cm | BMI: {bmi} ({status})")
-
-intensity = st.select_slider("Select Exercise Intensity:", options=["Rest", "Light", "Moderate", "Heavy"])
-
-i_map = {
-    "Rest": {"m": 1.2, "p": 1.2, "f": 0.30, "s": 4000},
-    "Light": {"m": 1.375, "p": 1.5, "f": 0.25, "s": 7000},
-    "Moderate": {"m": 1.55, "p": 1.8, "f": 0.25, "s": 10000},
-    "Heavy": {"m": 1.725, "p": 2.2, "f": 0.20, "s": 15000}
-}
-lvl = i_map[intensity]
-
-# Biological Calculations
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
-cal = int(bmr * lvl["m"]) + (400 if "Gain" in goal else -500 if "Loss" in goal else 0)
-prot = int(w * lvl["p"])
-fat_g = int((cal * lvl["f"]) / 9)
-water = round((w * 0.035) + (0.5 if intensity != "Rest" else 0), 1)
 
-# --- 3. DISPLAY VITALS ---
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("🔥 Calories", f"{cal} kcal")
-c2.metric("🍗 Protein", f"{prot} g")
-c3.metric("🥑 Fat Content", f"{fat_g} g")
-c4.metric("💧 Water", f"{water} L")
+# Intensity Multipliers
+i_map = {"Rest": 1.2, "Light": 1.375, "Moderate": 1.55, "Heavy": 1.725}
+cal = int(bmr * i_map[intensity])
 
-st.info(f"👟 **Step Goal:** {lvl['s']:,} | ⚖️ **BMI Status:** {status}")
+# Goal Adjustments
+if "Loss" in goal: cal -= 500
+elif "Gain" in goal or "Muscle" in goal: cal += 400
+
+st.title("🛡️ Cura AI: Performance Coach")
+st.info(f"👤 **Live Profile:** {g} | {w}kg | Goal: {goal}")
+
+# Metrics Display
+c1, c2, c3 = st.columns(3)
+c1.metric("🔥 Target Calories", f"{cal} kcal")
+c2.metric("💧 Daily Water", f"{water} L", delta="Hydration Target")
+c3.metric("⚖️ BMI Status", f"{bmi}")
+
 st.divider()
 
-# --- 4. THE CACHED AI CALL & FAIL-SAFE LOGIC ---
-
-# Initialize memory to avoid losing the plan on refresh
+# --- 4. THE SMART AI PROMPT ---
 if "final_plan" not in st.session_state:
     st.session_state.final_plan = None
 
-if st.button("🚀 Generate AI Workout & Meal Plan"):
-    # If a plan already exists, don't waste the API quota
-    if st.session_state.final_plan:
-        st.success("✅ Plan loaded from Session Memory.")
-    else:
-        if "GEMINI_API_KEY" not in st.secrets:
-            st.error("Missing API Key in .streamlit/secrets.toml!")
-        else:
-            with st.spinner(f"Cura AI is analyzing biological data for {w}kg..."):
-                try:
-                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    
-                    # Discovery: Find which model is active for your key
-                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    target_model = available_models[0] if available_models else "gemini-1.5-flash"
-                    
-                    model = genai.GenerativeModel(target_model)
-                    prompt = (f"Coach: Create a 1-day {cuisine} meal schedule and 45m workout for {g}, {w}kg. "
-                              f"BMI: {bmi}, Goal: {goal}, Intensity: {intensity}. "
-                              f"Target: {cal}cal, {prot}g protein.")
-                    
-                    response = model.generate_content(prompt)
-                    st.session_state.final_plan = response.text
-                    st.balloons()
-                    
-                except Exception as e:
-                    # THE EXPO FAIL-SAFE: If 429 Error or 404 occurs, show this professional schedule
-                    st.warning("⚠️ Cloud Engine busy. Switching to Local Performance Engine...")
-                    
-                    local_backup = f"""
-                    ## 🍱 {cuisine} Performance Schedule ({w}kg)
-                    **Target:** {cal} kcal | **Goal:** {goal} | **Activity:** {intensity}
-                    
-                    | Time | Activity | Nutrition / Meal Details |
-                    | :--- | :--- | :--- |
-                    | **08:30 AM** | **Breakfast** | Vegetable Poha / Moong Dal Chilla (High Fiber) |
-                    | **11:00 AM** | **Mid-Day** | 1 Seasonal Fruit + 5 Almonds (Healthy Fats) |
-                    | **01:30 PM** | **Lunch** | {cuisine} Protein Bowl: Brown Rice, Dal, & Grilled Veggies |
-                    | **05:00 PM** | **Workout** | **{intensity} Intensity**: 45m Brisk Walk / Strength |
-                    | **08:30 PM** | **Dinner** | Light {cuisine} Soup & Sautéed Greens |
-                    
-                    ---
-                    ### 📊 Local Targets for {w}kg {g}
-                    * 🔥 **Energy:** {cal} kcal
-                    * 🍗 **Protein:** {prot} g
-                    * 💧 **Hydration:** {water} L
-                    * 👟 **Steps:** {lvl['s']:,} steps
-                    
-                    *💡 Note: This plan is strictly calculated using Cura's local biological formulas.*
-                    """
-                    st.session_state.final_plan = local_backup
+if st.button("🚀 Generate Personalized Plan"):
+    with st.spinner("AI is analyzing Bio + Medical + Diet data..."):
+        try:
+            # DYNAMIC PROMPT: Now uses EVERYTHING the user entered
+            prompt = (
+                f"As a pro coach, create a 1-day plan for a {g}, {w}kg, {a}yo. "
+                f"Goal: {goal}. Medical Conditions: {hc}. "
+                f"Diet: {diet} ({cuisine} style). Avoid these: {dislikes}. "
+                f"Workout Intensity: {intensity}. "
+                f"Strictly include: 1. Meal plan totaling {cal} cal. 2. Specific advice for {hc}."
+            )
+            
+            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content(prompt)
+            st.session_state.final_plan = response.text
+            st.balloons()
+            
+        except Exception as e:
+            st.error("AI is currently offline. Showing local calculation.")
+            st.session_state.final_plan = f"Plan for {w}kg {g} seeking {goal} with {diet} diet."
 
-# Always display the plan once it has been generated or backed up
+# Display the result
 if st.session_state.final_plan:
-    st.markdown("---")
     st.markdown(st.session_state.final_plan)
 
-# Sidebar for Navigation
-if st.sidebar.button("🔄 Reset & Restart"):
-    st.session_state.final_plan = None
+if st.sidebar.button("🔄 Reset System"):
+    st.session_state.clear()
     st.switch_page("cura.py")
