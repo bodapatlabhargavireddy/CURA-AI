@@ -19,6 +19,12 @@ with col2:
     st.selectbox("Sex:", ["Male", "Female", "Other"], key="gender")
 
 st.divider()
+# --- In cura.py ---
+
 if st.button("Start Assessment 🏥"):
-    # Use the EXACT filename without the 'pages/' prefix 
-    st.switch_page("pages/1_Health.py")
+    st.session_state["weight"] = st.session_state.weight
+    st.session_state["height"] = st.session_state.height
+    st.session_state["age"] = st.session_state.age
+    st.session_state["gender"] = st.session_state.gender
+    
+    st.switch_page("pages/1_Health.py") # Use the simple filename we discussed
