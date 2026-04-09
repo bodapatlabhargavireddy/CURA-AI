@@ -9,7 +9,6 @@ g = st.session_state.get("user_gender")
 goal = st.session_state.get("user_goal")
 diet = st.session_state.get("user_diet", "Vegetarian")
 cuisine = st.session_state.get("user_cuisine", "Indian")
-hc = st.session_state.get("health_conditions", ["None"])
 
 if any(v is None for v in [w, h, a, g, goal]):
     st.error("⚠️ Profile incomplete. Please restart.")
@@ -18,12 +17,11 @@ if any(v is None for v in [w, h, a, g, goal]):
 # --- 2. EXERCISE INTENSITY ENGINE ---
 st.title("🛡️ Cura AI: Performance Coach")
 
-# This is the slider you were looking for!
 st.subheader("🏋️ Today's Activity")
 intensity = st.select_slider(
     "Set your exercise intensity for today:",
     options=["Rest", "Light", "Moderate", "Heavy"],
-    value="Moderate" # Default starting position
+    value="Moderate"
 )
 
 # Intensity Mapping Logic
@@ -36,11 +34,8 @@ i_map = {
 lvl = i_map[intensity]
 
 # --- 3. BIOLOGICAL CALCULATIONS ---
-# Protein & Steps
 protein_target = round(w * lvl["prot"], 1)
 step_goal = lvl["steps"]
-
-# Water (4% of BW + Intensity boost)
 water_target = round((w * 0.04) + lvl["water"], 1)
 
 # Calories (Mifflin-St Jeor)
@@ -48,12 +43,12 @@ s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
 cal = int(bmr * lvl["mult"])
 
-# Goal Offset
 if "Loss" in goal: cal -= 500
 elif "Gain" in goal or "Muscle" in goal: cal += 400
 
-# --- 4. DYNAMIC DASHBOARD ---
-st.info(f"📋 **Current Strategy:** {goal} | {intensity} Intensity")
+# --- 4. THE UPDATED STATUS BAR ---
+# Now explicitly includes Sex and Weight as requested
+st.info(f"📋 **Current Strategy:** {goal} | {intensity} Intensity | **Sex:** {g} | **Weight:** {w}kg")
 
 # Row 1: Primary Vitals
 c1, c2, c3 = st.columns(3)
@@ -61,7 +56,6 @@ c1.metric("🔥 Calories", f"{cal} kcal")
 c2.metric("🍗 Protein", f"{protein_target} g")
 c3.metric("💧 Water", f"{water_target} L")
 
-# Row 2: Movement
 st.write("### 👟 Movement Target")
 st.metric("Daily Step Goal", f"{step_goal:,} steps", delta=f"{intensity} Level")
 
@@ -69,16 +63,16 @@ st.divider()
 
 # --- 5. AI GENERATION ---
 if st.button("🚀 Generate AI Plan"):
-    with st.spinner("Cura AI is analyzing your intensity level..."):
+    with st.spinner("Analyzing profile data..."):
         try:
             genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
             model = genai.GenerativeModel("gemini-1.5-flash")
             
+            # The prompt now includes all metrics for better AI accuracy
             prompt = (
-                f"User: {g}, {w}kg. Goal: {goal}. Intensity: {intensity}. "
+                f"User Profile: {g}, {w}kg, {a}yo. Goal: {goal}. Intensity: {intensity}. "
                 f"Diet: {diet} ({cuisine}). "
-                f"Targets: {cal} kcal, {protein_target}g protein, {step_goal} steps. "
-                f"Create a 1-day plan with specific {cuisine} meals."
+                f"Provide a 1-day plan for {cal} kcal, {protein_target}g protein, and {step_goal} steps."
             )
             
             response = model.generate_content(prompt)
@@ -86,4 +80,4 @@ if st.button("🚀 Generate AI Plan"):
             st.balloons()
         except:
             st.warning("Using Local Engine. API busy.")
-            st.write(f"Today's Target: {cal} kcal and {protein_target}g protein.")
+            st.write(f"Target {cal} kcal and {protein_target}g protein today for a {w}kg {g}.")
