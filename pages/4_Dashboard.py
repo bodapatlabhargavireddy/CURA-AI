@@ -60,24 +60,52 @@ st.write("### 👟 Movement Target")
 st.metric("Daily Step Goal", f"{step_goal:,} steps", delta=f"{intensity} Level")
 
 st.divider()
+# --- 5. THE AI GENERATOR (Optimized) ---
+if "final_plan" not in st.session_state:
+    st.session_state.final_plan = None
 
-# --- 5. AI GENERATION ---
-if st.button("🚀 Generate AI Plan"):
-    with st.spinner("Analyzing profile data..."):
+if st.button("🚀 Generate Personalized AI Plan"):
+    with st.spinner(f"Cura AI is generating a {goal} plan for a {w}kg {g}..."):
         try:
+            # Configure and Connect
             genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
             model = genai.GenerativeModel("gemini-1.5-flash")
             
-            # The prompt now includes all metrics for better AI accuracy
+            # The Professional Prompt for a 50kg Female Profile
             prompt = (
-                f"User Profile: {g}, {w}kg, {a}yo. Goal: {goal}. Intensity: {intensity}. "
-                f"Diet: {diet} ({cuisine}). "
-                f"Provide a 1-day plan for {cal} kcal, {protein_target}g protein, and {step_goal} steps."
+                f"Act as a professional Clinical Nutritionist. "
+                f"Client: {g}, {w}kg, {a} years old. Goal: {goal}. "
+                f"Activity Level: {intensity} ({steps} steps goal). "
+                f"Dietary Preference: {diet} ({cuisine} style). "
+                f"Requirements: Strictly {cal} calories and {protein_target}g protein. "
+                f"Provide: 1. A 4-meal {cuisine} menu. 2. A {intensity} intensity workout. "
+                f"3. Specific health advice for a {w}kg female aiming for {goal}."
             )
             
+            # Request content
             response = model.generate_content(prompt)
-            st.markdown(response.text)
+            st.session_state.final_plan = response.text
             st.balloons()
-        except:
-            st.warning("Using Local Engine. API busy.")
-            st.write(f"Target {cal} kcal and {protein_target}g protein today for a {w}kg {g}.")
+            
+        except Exception as e:
+            # If the API fails, we provide a more detailed 'Local' plan so the screen isn't empty
+            st.warning("⚠️ AI Engine is currently at capacity. Displaying calculated Biological Plan.")
+            
+            local_plan = f"""
+            ### 🍱 Biological Plan for {w}kg {g}
+            **Status:** AI Connection Limited | **Engine:** Local Deterministic Math
+            
+            - **Goal:** {goal}
+            - **Target Energy:** {cal} kcal
+            - **Protein Requirement:** {protein_target} g
+            - **Hydration:** {water_target} L
+            - **Daily Movement:** {steps:,} steps
+            
+            *Tip: Since you are aiming for {goal}, ensure your {cuisine} meals include high-quality protein sources like dal, paneer, or lean meats to hit your {protein_target}g target.*
+            """
+            st.session_state.final_plan = local_plan
+
+# Display the Markdown result (Outside the button logic)
+if st.session_state.final_plan:
+    st.markdown("---")
+    st.markdown(st.session_state.final_plan)
