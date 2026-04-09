@@ -1,21 +1,19 @@
 import streamlit as st
 
-st.set_page_config(page_title="Health Assessment", layout="centered")
+st.set_page_config(page_title="Health Assessment", layout="centered", page_icon="🏥")
 
-# --- DATA GUARD ---
-# If the user tries to skip page 1, we stop them here.
-if "weight" not in st.session_state:
-    st.error("⚠️ No profile data found. Please complete the Biological Profile first.")
+# --- DATA RECOVERY ---
+# We check the "user_weight" key we forced in cura.py
+if "user_weight" not in st.session_state:
+    st.error("⚠️ Profile data lost. Please complete the Biological Profile first.")
     if st.button("⬅️ Back to Home"):
         st.switch_page("cura.py")
     st.stop()
 
 st.title("🏥 Health Assessment")
-# Proof of sync for the judges:
-st.success(f"✅ Profile Sync Active: {st.session_state.gender} | {st.session_state.weight}kg")
+st.success(f"✅ Sync Active for: {st.session_state.user_gender} | {st.session_state.user_weight}kg")
 st.divider()
 
-# --- MEDICAL INPUTS ---
 st.subheader("📋 Medical History")
 st.multiselect(
     "Do you have any existing conditions?",
@@ -29,4 +27,7 @@ st.text_input("List any food allergies:", placeholder="e.g. Peanuts, Gluten", ke
 st.divider()
 
 if st.button("Next: Set Your Goal 🎯"):
+    # Force sync medical data
+    st.session_state["final_conditions"] = st.session_state.health_conditions
+    st.session_state["final_allergies"] = st.session_state.allergies
     st.switch_page("pages/2_Goal.py")
