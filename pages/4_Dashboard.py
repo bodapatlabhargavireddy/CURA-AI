@@ -67,35 +67,39 @@ if "final_ai_plan" not in st.session_state:
 
 if st.button("🚀 Generate AI Plan"):
     with st.spinner("Processing Biological Data..."):
-        # We use Flash because it's the fastest and has better rate limits
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        prompt = (
-            f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
-            f"Medical: {health}. Targets: {cal}kcal, {protein_target}g protein, {water_target}L water. "
-            f"Provide a short 24-hour meal and workout plan. Use bold headers."
-        )
+        # TRY THIS MODEL STRING FIRST
+        try:
+            # Adding 'models/' prefix fixes the 404 error in most SDK versions
+            model = genai.GenerativeModel('models/gemini-1.5-flash')
+            
+            prompt = (
+                f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
+                f"Medical: {health}. Targets: {cal}kcal, {protein_target}g protein, {water_target}L water. "
+                f"Provide a short 24-hour meal and workout plan. Use bold headers."
+            )
 
-        # RETRY LOOP (This is what makes it 'work' despite the 429 errors)
-        success = False
-        for attempt in range(3): # Try 3 times
-            try:
-                response = model.generate_content(prompt)
-                st.session_state.final_ai_plan = response.text
-                success = True
-                break # Exit loop if successful
-            except Exception as e:
-                if "429" in str(e):
-                    st.warning(f"API is busy. Retrying automatically in {5 * (attempt + 1)} seconds...")
-                    time.sleep(5 * (attempt + 1)) # Wait longer each time
-                else:
-                    st.error(f"Error: {e}")
-                    break
-        
-        if success:
-            st.balloons()
-        else:
-            st.error("The API is currently overloaded by the hackathon traffic. Please try once more in a moment.")
+            success = False
+            for attempt in range(3):
+                try:
+                    # Explicitly calling the content generation
+                    response = model.generate_content(prompt)
+                    st.session_state.final_ai_plan = response.text
+                    success = True
+                    break 
+                except Exception as e:
+                    if "429" in str(e):
+                        st.warning(f"Rate limit hit. Retrying in {5 * (attempt + 1)}s...")
+                        time.sleep(5 * (attempt + 1))
+                    else:
+                        st.error(f"Generation Error: {e}")
+                        break
+            
+            if success:
+                st.balloons()
+            
+        except Exception as model_err:
+            st.error(f"Model Initialization Error: {model_err}")
+            st.info("Try changing model name to 'gemini-1.5-flash' (without models/ prefix) if this persists.")
 
 if st.session_state.final_ai_plan:
     st.markdown(st.session_state.final_ai_plan)
