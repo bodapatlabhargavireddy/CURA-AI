@@ -70,7 +70,7 @@ if st.button("🚀 Generate AI Plan"):
         # TRY THIS MODEL STRING FIRST
         try:
             # Adding 'models/' prefix fixes the 404 error in most SDK versions
-            model = genai.GenerativeModel('models/gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-3-flash-preview')
             
             prompt = (
                 f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
