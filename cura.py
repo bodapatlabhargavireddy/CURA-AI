@@ -15,7 +15,7 @@ with col1:
 
 with col2:
     a_input = st.number_input("Age:", min_value=0, value=0, key="age_val")
-    g_input = st.selectbox("Sex:", ["Select...", "Male", "Female", "Other"], key="gender_val")
+    g_input = st.selectbox("Gender:", ["Select...", "Male", "Female", "Other"], key="gender_val")
 
 st.divider()
 
