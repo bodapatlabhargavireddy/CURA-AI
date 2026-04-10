@@ -1,6 +1,7 @@
 
 import streamlit as st
 import google.generativeai as genai
+import time
 
 # --- CONFIG ---
 st.set_page_config(page_title="Cura Monitoring", layout="wide")
@@ -46,24 +47,55 @@ if st.button("💾 Sync Data to Dashboard"):
 st.divider()
 
 # --- THE AI PROMPT (Now with Live BMI) ---
+import streamlit as st
+import google.generativeai as genai
+import time
+
+# --- AI GENERATOR BLOCK (REPLACE YOURS WITH THIS) ---
 if st.button("🍴 Generate Menu Based on NEW BMI"):
-    with st.spinner("AI analyzing your new BMI..."):
+    with st.spinner("AI analyzing your profile..."):
+        # 1. Models to try (Newest 2026 models first)
+        # Gemini 3.1 Flash-Lite is the most 'available' for free tier right now
+        models_to_try = [
+            'models/gemini-3.1-flash-lite-preview', 
+            'models/gemini-3.1-flash-preview',
+            'models/gemini-2.5-flash'
+        ]
+        
         prompt = f"""
         Act as a Dietician. 
         User Height: {height_cm}cm, Current Weight: {current_weight}kg.
-        Calculated BMI: {bmi} ({status}).
-        Goal: {goal}.
+        Calculated BMI: {bmi} ({status}). Goal: {goal}.
         
-        Task: Provide a 1-day menu specifically for an '{status}' BMI profile to reach '{goal}'.
+        Task: Provide a 1-day menu for an '{status}' profile to reach '{goal}'. 
+        Format: Use bold headers, be very concise to save tokens.
         """
+        
+        success = False
         try:
             genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            st.markdown(response.text)
-        except Exception as e:
-            st.error("AI is busy, but your BMI is updated above!")
-
-# Navigation
-if st.sidebar.button("🔄 Back to Dashboard"):
-    st.switch_page("pages/4_Dashboard.py")
+            
+            for model_id in models_to_try:
+                try:
+                    model = genai.GenerativeModel(model_id)
+                    # Use a short timeout to keep the demo moving
+                    response = model.generate_content(prompt)
+                    
+                    if response.text:
+                        st.markdown(response.text)
+                        st.balloons()
+                        success = True
+                        break # Success! Stop trying other models.
+                
+                except Exception as e:
+                    # If it's a 429 (Busy) or 404 (Old Model), try the next one
+                    if "429" in str(e) or "404" in str(e):
+                        continue 
+                    else:
+                        st.error(f"Error with {model_id}: {e}")
+            
+            if not success:
+                st.error("🚨 All AI Engines are currently at capacity. Please wait 20 seconds.")
+                
+        except Exception as config_err:
+            st.error(f"Configuration Error: {config_err}")
