@@ -1,7 +1,15 @@
 import streamlit as st
-import google.genai as genai 
+import google.generativeai as genai
+import time
 
-# --- 1. DATA RECOVERY ---
+# --- 1. API CONFIGURATION ---
+# Make sure your secret key is named "GEMINI_API_KEY" in Streamlit Cloud
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    st.error("API Key missing! Check your st.secrets.")
+
+# --- 2. DATA RECOVERY ---
 w = st.session_state.get("user_weight")
 h = st.session_state.get("user_height")
 a = st.session_state.get("user_age")
@@ -15,7 +23,7 @@ if any(v is None for v in [w, h, a, g, goal]):
     st.error("⚠️ Profile incomplete. Please restart.")
     st.stop()
 
-# --- 2. CALCULATIONS ---
+# --- 3. CALCULATIONS ---
 st.title("🛡️ Cura AI: Performance Coach")
 
 intensity = st.select_slider("Select Intensity:", options=["Rest", "Light", "Moderate", "Heavy"], value="Moderate")
@@ -28,56 +36,66 @@ i_map = {
 }
 lvl = i_map[intensity]
 
-# Fixed Calculations
+# Math Engine (Deterministic)
 protein_target = round(w * lvl["prot"], 1)
 step_goal = lvl["steps"]
-water_target = round((w * 0.04) + lvl["water"], 1) # ADDED WATER CALCULATION
+water_target = round((w * 0.04) + lvl["water"], 1)
 
 s_val = 5 if g == "Male" else -161
 bmr = (10 * w) + (6.25 * h) - (5 * a) + s_val
 cal = int(bmr * lvl["mult"])
+
 if "Loss" in goal: cal -= 500
 elif "Gain" in goal: cal += 400
 
-# --- 3. UI DASHBOARD ---
+# --- 4. UI DASHBOARD ---
 st.info(f"📋 **Strategy:** {goal} | {w}kg {g}")
 
 c1, c2, c3 = st.columns(3)
 c1.metric("🔥 Calories", f"{cal} kcal")
 c2.metric("🍗 Protein", f"{protein_target} g")
-c3.metric("💧 Water Intake", f"{water_target} L") # DISPLAYED WATER HERE
+c3.metric("💧 Water Intake", f"{water_target} L")
 
 st.write("### 👟 Activity Goal")
 st.metric("Steps Required", f"{step_goal:,}", delta=f"{intensity} Level")
 
 st.divider()
 
-# --- 4. THE AI GENERATOR ---
+# --- 5. THE AI GENERATOR (WITH RETRY LOGIC) ---
 if "final_ai_plan" not in st.session_state:
     st.session_state.final_ai_plan = None
 
 if st.button("🚀 Generate AI Plan"):
-    with st.spinner("Connecting to Gemini..."):
-        try:
-            client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-            
-            # Shorter prompt to prevent "Connection Busy"
-            prompt = (
-                f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
-                f"Medical: {health}. Targets: {cal}kcal, {protein_target}g protein, {water_target}L water. "
-                f"Include a {step_goal} step workout. Use bold headers."
-            )
-            
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt
-            )
-            
-            st.session_state.final_ai_plan = response.text
+    with st.spinner("Processing Biological Data..."):
+        # We use Flash because it's the fastest and has better rate limits
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = (
+            f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
+            f"Medical: {health}. Targets: {cal}kcal, {protein_target}g protein, {water_target}L water. "
+            f"Provide a short 24-hour meal and workout plan. Use bold headers."
+        )
+
+        # RETRY LOOP (This is what makes it 'work' despite the 429 errors)
+        success = False
+        for attempt in range(3): # Try 3 times
+            try:
+                response = model.generate_content(prompt)
+                st.session_state.final_ai_plan = response.text
+                success = True
+                break # Exit loop if successful
+            except Exception as e:
+                if "429" in str(e):
+                    st.warning(f"API is busy. Retrying automatically in {5 * (attempt + 1)} seconds...")
+                    time.sleep(5 * (attempt + 1)) # Wait longer each time
+                else:
+                    st.error(f"Error: {e}")
+                    break
+        
+        if success:
             st.balloons()
-            
-        except Exception as e:
-            st.error("🚨 API Busy. Please count to 30 and click again (One time only).")
+        else:
+            st.error("The API is currently overloaded by the hackathon traffic. Please try once more in a moment.")
 
 if st.session_state.final_ai_plan:
     st.markdown(st.session_state.final_ai_plan)
