@@ -1,10 +1,17 @@
-
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import time
+import random
 
 # --- CONFIG ---
 st.set_page_config(page_title="Cura Monitoring", layout="wide")
+
+# --- API CONFIGURATION ---
+try:
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    st.error("API Key missing or invalid! Check your st.secrets.")
+    st.stop()
 
 # --- DATA RETRIEVAL ---
 # Get height from session state (needed for BMI)
@@ -19,7 +26,6 @@ st.subheader("⚖️ Real-Time Body Metrics")
 w_col1, w_col2, w_col3 = st.columns(3)
 
 with w_col1:
-    # Use a unique key for this page's input
     current_weight = st.number_input("Enter Current Weight (kg)", 30.0, 200.0, float(starting_weight))
 
 with w_col2:
@@ -47,19 +53,14 @@ if st.button("💾 Sync Data to Dashboard"):
 st.divider()
 
 # --- THE AI PROMPT (Now with Live BMI) ---
-import streamlit as st
-import google.generativeai as genai
-import time
-
-# --- AI GENERATOR BLOCK (REPLACE YOURS WITH THIS) ---
 if st.button("🍴 Generate Menu Based on NEW BMI"):
     with st.spinner("AI analyzing your profile..."):
-        # 1. Models to try (Newest 2026 models first)
-        # Gemini 3.1 Flash-Lite is the most 'available' for free tier right now
+        
+        # Consistent stable model selection matching your other pages
         models_to_try = [
-            'models/gemini-3.1-flash-lite-preview', 
-            'models/gemini-3.1-flash-preview',
-            'models/gemini-2.5-flash'
+            "gemini-3.1-flash-lite",   
+            "gemini-3.1-flash",        
+            "gemini-2.5-flash"         
         ]
         
         prompt = f"""
@@ -72,30 +73,33 @@ if st.button("🍴 Generate Menu Based on NEW BMI"):
         """
         
         success = False
-        try:
-            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            
-            for model_id in models_to_try:
+        
+        for model_id in models_to_try:
+            # Simple retry loop for 503 clusters or minor hiccups
+            for attempt in range(2):
                 try:
-                    model = genai.GenerativeModel(model_id)
-                    # Use a short timeout to keep the demo moving
-                    response = model.generate_content(prompt)
+                    response = client.models.generate_content(
+                        model=model_id,
+                        contents=prompt
+                    )
                     
                     if response.text:
                         st.markdown(response.text)
                         st.balloons()
                         success = True
-                        break # Success! Stop trying other models.
-                
+                        break # Success! Break inner loop
+                        
                 except Exception as e:
-                    # If it's a 429 (Busy) or 404 (Old Model), try the next one
-                    if "429" in str(e) or "404" in str(e):
-                        continue 
-                    else:
-                        st.error(f"Error with {model_id}: {e}")
+                    err_str = str(e)
+                    if "503" in err_str:
+                        wait = random.uniform(1.5, 3.5)
+                        time.sleep(wait)
+                        continue # Retry same model
+                    elif "429" in err_str or "404" in err_str:
+                        break # Skip inner loop to jump to the next model layout
             
-            if not success:
-                st.error("🚨 All AI Engines are currently at capacity. Please wait 20 seconds.")
-                
-        except Exception as config_err:
-            st.error(f"Configuration Error: {config_err}")
+            if success:
+                break # Break outer loop since we got our meal plan
+
+        if not success:
+            st.error("🚨 All AI Engines are currently at capacity. Please wait 20 seconds.")
