@@ -1,6 +1,7 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import time
+import random
 
 # --- 1. API CONFIGURATION ---
 # Make sure your secret key is named "GEMINI_API_KEY" in Streamlit Cloud
