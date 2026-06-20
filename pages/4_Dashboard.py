@@ -4,11 +4,13 @@ import time
 import random
 
 # --- 1. API CONFIGURATION ---
-# Make sure your secret key is named "GEMINI_API_KEY" in Streamlit Cloud
+# Initialize the modern Client (looks for st.secrets["GEMINI_API_KEY"] automatically if left empty, 
+# or explicitly passed like this for safety)
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception as e:
-    st.error("API Key missing! Check your st.secrets.")
+    st.error("API Key missing or invalid! Check your st.secrets.")
+    st.stop()
 
 # --- 2. DATA RECOVERY ---
 w = st.session_state.get("user_weight")
@@ -62,45 +64,57 @@ st.metric("Steps Required", f"{step_goal:,}", delta=f"{intensity} Level")
 
 st.divider()
 
-# --- 5. THE AI GENERATOR (WITH RETRY LOGIC) ---
+# --- 5. THE AI GENERATOR (WITH MODERN MODEL ROTATION & RETRY) ---
 if "final_ai_plan" not in st.session_state:
     st.session_state.final_ai_plan = None
 
 if st.button("🚀 Generate AI Plan"):
     with st.spinner("Processing Biological Data..."):
-        # TRY THIS MODEL STRING FIRST
-        try:
-            # Adding 'models/' prefix fixes the 404 error in most SDK versions
-            model = genai.GenerativeModel('gemini-3-flash-preview')
-            
-            prompt = (
-                f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
-                f"Medical: {health}. Targets: {cal}kcal, {protein_target}g protein, {water_target}L water. "
-                f"Provide a short 24-hour meal and workout plan. Use bold headers."
-            )
+        
+        # Consistent model rotation aligned with your Scanner page
+        models_to_rotate = [
+            "gemini-3.1-flash-lite",   
+            "gemini-3.1-flash",        
+            "gemini-2.5-flash-lite",   
+            "gemini-2.5-flash"         
+        ]
+        
+        prompt = (
+            f"User: {g}, {w}kg. Goal: {goal}. Diet: {diet} ({cuisine}). "
+            f"Medical: {health}. Targets: {cal}kcal, {protein_target}g protein, {water_target}L water. "
+            f"Provide a short 24-hour meal and workout plan. Use bold headers."
+        )
 
-            success = False
-            for attempt in range(3):
+        success = False
+        
+        # Outer loop iterates through fallbacks if a cluster or model is completely unavailable
+        for m_id in models_to_rotate:
+            for attempt in range(2): # 2 attempts per model with jitter
                 try:
-                    # Explicitly calling the content generation
-                    response = model.generate_content(prompt)
+                    response = client.models.generate_content(
+                        model=m_id,
+                        contents=prompt
+                    )
                     st.session_state.final_ai_plan = response.text
                     success = True
-                    break 
+                    break
                 except Exception as e:
-                    if "429" in str(e):
-                        st.warning(f"Rate limit hit. Retrying in {5 * (attempt + 1)}s...")
-                        time.sleep(5 * (attempt + 1))
-                    else:
-                        st.error(f"Generation Error: {e}")
-                        break
+                    err_str = str(e)
+                    if "503" in err_str:
+                        # Wait out high traffic clusters with random jitter
+                        wait = random.uniform(1.5, 3.5)
+                        time.sleep(wait)
+                        continue
+                    elif "429" in err_str or "404" in err_str:
+                        break # Break inner loop to try the next fallback model instantly
             
             if success:
                 st.balloons()
-            
-        except Exception as model_err:
-            st.error(f"Model Initialization Error: {model_err}")
-            st.info("Try changing model name to 'gemini-1.5-flash' (without models/ prefix) if this persists.")
+                break
+
+        if not success:
+            st.error("🚨 All Google Cloud clusters are currently at 100% capacity.")
+            st.info("HACKATHON TIP: Switch to a personal mobile hotspot if regional 503 errors persist.")
 
 if st.session_state.final_ai_plan:
     st.markdown(st.session_state.final_ai_plan)
