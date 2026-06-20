@@ -13,11 +13,14 @@ except Exception as e:
     st.error("API Key missing or invalid! Check your st.secrets.")
     st.stop()
 
-# --- DATA RETRIEVAL ---
-# Get height from session state (needed for BMI)
-height_cm = st.session_state.get("height", 170.0) 
-starting_weight = st.session_state.get("weight", 70.0)
-goal = st.session_state.get("goal", "Maintenance")
+# --- DATA RETRIEVAL (STRICT) ---
+height_cm = st.session_state.get("user_height") 
+starting_weight = st.session_state.get("user_weight")
+goal = st.session_state.get("user_goal")
+
+if any(v is None for v in [height_cm, starting_weight, goal]):
+    st.error("⚠️ Profile incomplete! Please complete your onboarding page first to sync metrics.")
+    st.stop()
 
 st.title("🛡️ Cura Live Monitoring")
 
@@ -26,8 +29,8 @@ st.subheader("⚖️ Real-Time Body Metrics")
 w_col1, w_col2, w_col3 = st.columns(3)
 
 with w_col1:
+    # Explicitly cast starting_weight to float since it comes from session state
     current_weight = st.number_input("Enter Current Weight (kg)", 30.0, 200.0, float(starting_weight))
-
 with w_col2:
     # FIXED BMI MATH: Uses 'current_weight' instead of 'starting_weight'
     bmi = round(current_weight / ((height_cm / 100) ** 2), 1)
